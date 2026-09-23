@@ -1,63 +1,72 @@
-import { Appointment, Service } from "@features/appointments/types/appointments";
-import { INITIAL_APPOINTMENTS, MOCK_SERVICES } from "./mockAppointments";
+import type { Appointment, Service } from  "@/types/appointment";
 
-const STORAGE_KEY = "zeewspace_salon_appointments";
+const API_BASE_URL = "https://6ab3f4b1217e436588318291.mockapi.io";
 
 export const appointmentService = {
+  // GET /services
   getServices: async (): Promise<Service[]> => {
-    return MOCK_SERVICES;
+    const response = await fetch(`${API_BASE_URL}/services`);
+    if (!response.ok) throw new Error("Error al obtener los servicios");
+    return response.json();
   },
 
+  // GET /appointments
   getAppointments: async (): Promise<Appointment[]> => {
-    const data = localStorage.getItem(STORAGE_KEY);
-    if (!data) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_APPOINTMENTS));
-      return INITIAL_APPOINTMENTS;
-    }
-    return JSON.parse(data);
+    const response = await fetch(`${API_BASE_URL}/appointments`);
+    if (!response.ok) throw new Error("Error al obtener las citas");
+    return response.json();
   },
 
+  // POST /appointments
   createAppointment: async (newAppointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt" | "durationMinutes">): Promise<Appointment> => {
-    const appointments = await appointmentService.getAppointments();
+   
+    //aqui se obtienen los servicios para calcular la duración automáticamente
     const services = await appointmentService.getServices();
-    
     const service = services.find(s => s.id === newAppointmentData.serviceId);
     const durationMinutes = service ? service.durationMinutes : 30;
 
-    const newAppointment: Appointment = {
+    const payload = {
       ...newAppointmentData,
-      id: `apt-${Date.now()}`,
       durationMinutes,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    const updated = [newAppointment, ...appointments];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return newAppointment;
-  },
-
-  updateAppointmentStatus: async (id: string, status: Appointment["status"]): Promise<Appointment> => {
-    const appointments = await appointmentService.getAppointments();
-    let updatedAppointment: Appointment | null = null;
-
-    const updated = appointments.map(apt => {
-      if (apt.id === id) {
-        updatedAppointment = { ...apt, status, updatedAt: new Date().toISOString() };
-        return updatedAppointment;
-      }
-      return apt;
+    const response = await fetch(`${API_BASE_URL}/appointments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    if (!updatedAppointment) throw new Error("Cita no encontrada");
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    return updatedAppointment;
+    if (!response.ok) throw new Error("Error al crear la cita");
+    return response.json();
   },
 
+  // PUT /appointments/:id (Actualizar estado)
+  updateAppointmentStatus: async (id: string, status: Appointment["status"]): Promise<Appointment> => {
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status,
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+
+    if (!response.ok) throw new Error("Error al actualizar el estado de la cita");
+    return response.json();
+  },
+
+  // DELETE /appointments/:id
   deleteAppointment: async (id: string): Promise<void> => {
-    const appointments = await appointmentService.getAppointments();
-    const filtered = appointments.filter(apt => apt.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) throw new Error("Error al eliminar la cita");
   }
 };
