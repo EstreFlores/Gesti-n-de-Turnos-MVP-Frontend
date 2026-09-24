@@ -135,6 +135,7 @@ export default function App() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         services={services}
+        existingAppointments={appointments}
         onAppointmentCreated={refreshAppointments}
       />
     </div>

@@ -4,44 +4,33 @@ import { z } from "zod";
 export const appointmentFormSchema = z.object({
   clientName: z
     .string()
-    .min(2, {
-      message: "El nombre del cliente debe tener al menos 2 caracteres.",
-    }),
+    .min(2, { message: "El nombre del cliente debe tener al menos 2 caracteres." })
+    .regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, { message: "El nombre solo debe contener letras y espacios." }),
 
-  clientPhone: z.string().optional(),
+  clientPhone: z
+    .string()
+    .min(10, { message: "El teléfono debe tener al menos 10 dígitos." })
+    .regex(/^\+?[0-9\s()-]+$/, { message: "Ingresa un número de teléfono válido." }),
 
   serviceId: z
     .string()
-    .min(1, {
-      message: "Debes seleccionar un servicio.",
-    }),
+    .min(1, { message: "Debes seleccionar un servicio." }),
 
   date: z
     .string()
-    .min(1, {
-      message: "La fecha es obligatoria.",
-    })
-    .refine(
-      (date) => !isBefore(parseISO(date), startOfToday()),
-      {
-        message: "La fecha no puede ser anterior a hoy.",
-      }
-    ),
+    .min(1, { message: "La fecha es obligatoria." })
+    .refine((date) => !isBefore(parseISO(date), startOfToday()), {
+      message: "La fecha no puede ser anterior a hoy.",
+    }),
 
   startTime: z
     .string()
-    .min(1, {
-      message: "La hora de inicio es obligatoria.",
-    }),
+    .min(1, { message: "La hora de inicio es obligatoria." }),
 
   durationMinutes: z.coerce
     .number()
-    .int({
-      message: "La duración debe ser un número entero.",
-    })
-    .positive({
-      message: "La duración debe ser mayor a 0 minutos.",
-    }),
+    .int({ message: "La duración debe ser un número entero." })
+    .positive({ message: "La duración debe ser mayor a 0 minutos." }),
 
   notes: z.string().optional(),
 
@@ -50,6 +39,4 @@ export const appointmentFormSchema = z.object({
     .default("pending"),
 });
 
-export type AppointmentFormValues = z.infer<
-  typeof appointmentFormSchema
->;
+export type AppointmentFormValues = z.infer<typeof appointmentFormSchema>;
