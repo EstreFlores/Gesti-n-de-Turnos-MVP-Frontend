@@ -6,12 +6,14 @@ import { Sidebar } from "@/components/Sidebar";
 import { StatsCards } from "@/components/StatsCards";
 import { AppointmentModal } from "@/components/AppointmentModal";
 import { Plus, Calendar as CalendarIcon, User } from "lucide-react";
+import { toast } from "@/components/ui/toast";
 
 export default function App() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [appointmentToEdit, setAppointmentToEdit] = useState<Appointment | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -51,15 +53,30 @@ export default function App() {
     }
   };
 
+  
   const handleDelete = async (id: string) => {
-    if (confirm("¿Estás segura de que deseas eliminar este turno?")) {
-      try {
-        await appointmentService.deleteAppointment(id);
-        setAppointments((prev) => prev.filter((apt) => apt.id !== id));
-      } catch (error) {
-        console.error("Error al eliminar cita:", error);
-      }
-    }
+  try {
+    await appointmentService.deleteAppointment(id);
+    setAppointments((prev) => prev.filter((apt) => apt.id !== id));
+    toast.add({
+      title: "Cita eliminada",
+      description: "La cita se eliminó correctamente.",
+      type: "success",
+    });
+  } catch (error) {
+    console.error("Error al eliminar cita:", error);
+    toast.add({
+      title: "No se pudo eliminar la cita",
+      description: "Ocurrió un error al intentar eliminarla.",
+      type: "error",
+    });
+  }
+};
+
+
+  const handleEdit = (appointment: Appointment) => {
+    setAppointmentToEdit(appointment);
+    setIsModalOpen(true);
   };
 
   if (loading) {
@@ -124,6 +141,7 @@ export default function App() {
               services={services}
               onStatusChange={handleStatusChange}
               onDelete={handleDelete}
+              onEdit={handleEdit}
             />
           </section>
 
@@ -131,11 +149,15 @@ export default function App() {
       </main>
 
       {/* Modal de Nueva Cita  */}
-      <AppointmentModal 
+      <AppointmentModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setAppointmentToEdit(null);
+        }}
         services={services}
         existingAppointments={appointments}
+        appointmentToEdit={appointmentToEdit}
         onAppointmentCreated={refreshAppointments}
       />
     </div>

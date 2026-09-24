@@ -44,6 +44,25 @@ export const appointmentService = {
     return response.json();
   },
 
+  updateAppointment: async (
+    id: string,
+    appointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">
+  ): Promise<Appointment> => {
+    const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ...appointmentData,
+        updatedAt: new Date().toISOString(),
+      }),
+    });
+
+    if (!response.ok) throw new Error("Error al actualizar la cita");
+    return response.json();
+  },
+
   // PUT /appointments/:id (Actualizar estado)
   updateAppointmentStatus: async (id: string, status: Appointment["status"]): Promise<Appointment> => {
     const response = await fetch(`${API_BASE_URL}/appointments/${id}`, {

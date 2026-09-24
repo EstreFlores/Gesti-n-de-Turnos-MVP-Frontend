@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Appointment, Service } from "@/types/appointment";
-import { appointmentFormSchema } from "@/features/appointments/schemas/appointmentSchema";
+import { appointmentFormSchema, type AppointmentFormValues } from "@/features/appointments/schemas/appointmentSchema";
 import { appointmentService } from "@/features/appointments/api/appointmentService";
+import { toast } from "@/components/ui/toast";
 import { X, Calendar, Clock, User, Phone, Scissors, AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface AppointmentModalProps {
@@ -11,6 +12,8 @@ interface AppointmentModalProps {
   onClose: () => void;
   services: Service[];
   existingAppointments: Appointment[];
+  appointmentToEdit?: Appointment | null;
+  //onAppointmentCreated: () => void;
   onAppointmentCreated: () => void;
 }
 
@@ -26,6 +29,7 @@ export function AppointmentModal({
   onClose, 
   services, 
   existingAppointments, 
+  appointmentToEdit,
   onAppointmentCreated 
 }: AppointmentModalProps) {
   const [loading, setLoading] = useState(false);
@@ -47,6 +51,37 @@ export function AppointmentModal({
       notes: "",
     },
   });
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (appointmentToEdit) {
+      const professionalMatch = appointmentToEdit.notes?.match(/\[Profesional: (.+?)\]/);
+      setProfessional(professionalMatch?.[1] || PROFESSIONALS[0]);
+      reset({
+        clientName: appointmentToEdit.clientName,
+        clientPhone: appointmentToEdit.clientPhone || "",
+        serviceId: appointmentToEdit.serviceId,
+        date: appointmentToEdit.date,
+        startTime: appointmentToEdit.startTime,
+        durationMinutes: appointmentToEdit.durationMinutes,
+        notes: appointmentToEdit.notes?.replace(/\s*\[Profesional: .+?\]\s*$/, "").trim() || "",
+        status: appointmentToEdit.status,
+      });
+    } else {
+      setProfessional(PROFESSIONALS[0]);
+      reset({
+        status: "pending",
+        durationMinutes: services[0]?.durationMinutes || 45,
+        clientName: "",
+        clientPhone: "",
+        serviceId: services[0]?.id || "",
+        date: "",
+        startTime: "",
+        notes: "",
+      });
+    }
+  }, [isOpen, appointmentToEdit, reset, services]);
 
   const watchedServiceId = watch("serviceId");
   const watchedDate = watch("date");
@@ -81,6 +116,7 @@ export function AppointmentModal({
     const newEndTotal = newStartTotal + durationMinutes;
 
     return existingAppointments.find((apt) => {
+      if (apt.id === appointmentToEdit?.id) return false;
       if (apt.date !== watchedDate) return false;
       
       const [aptH, aptM] = apt.startTime.split(":").map(Number);
@@ -90,30 +126,52 @@ export function AppointmentModal({
 
       return newStartTotal < aptEndTotal && newEndTotal > aptStartTotal;
     });
-  }, [watchedDate, watchedStartTime, durationMinutes, existingAppointments, services]);
+  }, [watchedDate, watchedStartTime, durationMinutes, existingAppointments, services, appointmentToEdit]);
 
   if (!isOpen) return null;
 
-  const onSubmit = async (data: any) => {
+  const onSubmit = async (data: AppointmentFormValues) => {
     if (overlapConflict) {
-      alert("No se puede guardar la cita debido a un solapamiento de horario.");
+      toast.add({
+        title: "Horario no disponible",
+        description: "No se puede guardar la cita debido a un solapamiento.",
+        type: "error",
+      });
       return;
     }
 
     try {
       setLoading(true);
-      await appointmentService.createAppointment({
+      const notes = `${data.notes || ""} [Profesional: ${professional}]`.trim();
+      const appointmentData = {
         ...data,
         durationMinutes,
-        notes: `${data.notes || ""} [Profesional: ${professional}]`.trim(),
-      });
+        notes,
+      };
+
+      if (appointmentToEdit) {
+        await appointmentService.updateAppointment(appointmentToEdit.id, appointmentData);
+      } else {
+        await appointmentService.createAppointment(appointmentData);
+      }
 
       reset();
       onAppointmentCreated();
       onClose();
+      toast.add({
+        title: appointmentToEdit ? "Cita actualizada" : "Cita creada",
+        description: appointmentToEdit
+          ? "Los datos de la cita se actualizaron correctamente."
+          : "La cita se registró correctamente.",
+        type: "success",
+      });
     } catch (error) {
-      console.error("Error al crear la cita:", error);
-      alert("Hubo un error al registrar la cita en la API.");
+      console.error("Error al guardar la cita:", error);
+      toast.add({
+        title: "No se pudo guardar la cita",
+        description: "Ocurrió un error al comunicarse con la API.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -130,7 +188,9 @@ export function AppointmentModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-slate-900 text-base">Nueva Cita</h3>
+                <h3 className="font-bold text-slate-900 text-base">
+                  {appointmentToEdit ? "Editar Cita" : "Nueva Cita"}
+                </h3>
               </div>
               <p className="text-xs text-slate-500">
                 Ingresa los datos del turno. El motor valida solapamientos en tiempo real.
@@ -314,7 +374,7 @@ export function AppointmentModal({
                 disabled={loading || Boolean(overlapConflict)}
                 className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-primary hover:bg-rose-700 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Guardando..." : "Confirmar y Guardar Turno"}
+                {loading ? "Guardando..." : appointmentToEdit ? "Guardar Cambios" : "Confirmar y Guardar Turno"}
               </button>
             </div>
           </div>

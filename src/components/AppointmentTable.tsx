@@ -16,6 +16,7 @@ interface AppointmentTableProps {
   services: Service[];
   onStatusChange: (id: string, newStatus: Appointment["status"]) => void;
   onDelete: (id: string) => void;
+  onEdit: (appointment: Appointment) => void;
 }
 
 export const AppointmentTable: React.FC<AppointmentTableProps> = ({
@@ -23,6 +24,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
   services,
   onStatusChange,
   onDelete,
+  onEdit,
 }) => {
   const getServiceName = (serviceId: string) => {
     const service = services.find((s) => s.id === serviceId);
@@ -102,6 +104,13 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
                     onClick={() => onDelete(apt.id)}
                   >
                     Eliminar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onEdit(apt)}
+                  >
+                    Editar
                   </Button>
                 </TableCell>
               </TableRow>
