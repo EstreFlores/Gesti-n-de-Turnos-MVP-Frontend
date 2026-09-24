@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { appointmentService } from "@/features/appointments/api/appointmentService";
 import type { Appointment, Service } from "@/types/appointment";
 import { AppointmentTable } from "@/components/AppointmentTable";
@@ -14,6 +14,39 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [appointmentToEdit, setAppointmentToEdit] = useState<Appointment | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<Appointment["status"] | "all">("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const appointmentsPerPage = 5;
+
+  const filteredAppointments = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase();
+
+    return appointments.filter((appointment) => {
+      const matchesName = appointment.clientName.toLowerCase().includes(normalizedSearch);
+      const matchesDate = !selectedDate || appointment.date === selectedDate;
+      const matchesStatus = selectedStatus === "all" || appointment.status === selectedStatus;
+
+      return matchesName && matchesDate && matchesStatus;
+    });
+  }, [appointments, searchTerm, selectedDate, selectedStatus]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAppointments.length / appointmentsPerPage));
+  const paginatedAppointments = filteredAppointments.slice(
+    (currentPage - 1) * appointmentsPerPage,
+    currentPage * appointmentsPerPage
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedDate, selectedStatus]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   useEffect(() => {
     async function loadData() {
@@ -137,11 +170,21 @@ export default function App() {
             </div>
             
             <AppointmentTable 
-              appointments={appointments}
+              appointments={paginatedAppointments}
               services={services}
               onStatusChange={handleStatusChange}
               onDelete={handleDelete}
               onEdit={handleEdit}
+              searchTerm={searchTerm}
+              selectedDate={selectedDate}
+              selectedStatus={selectedStatus}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalFilteredAppointments={filteredAppointments.length}
+              onSearchChange={setSearchTerm}
+              onDateChange={setSelectedDate}
+              onStatusFilterChange={setSelectedStatus}
+              onPageChange={setCurrentPage}
             />
           </section>
 
