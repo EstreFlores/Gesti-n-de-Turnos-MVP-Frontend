@@ -1,11 +1,13 @@
-import { LayoutDashboard, CalendarDays, Calendar, Scissors } from "lucide-react";
+import { LayoutDashboard, CalendarDays, Calendar, Scissors, Moon, Sun } from "lucide-react";
 
 interface SidebarProps {
   currentView: string;
   onViewChange: (view: string) => void;
+  isDarkMode: boolean;
+  onThemeChange: () => void;
 }
 
-export function Sidebar({ currentView, onViewChange }: SidebarProps) {
+export function Sidebar({ currentView, onViewChange, isDarkMode, onThemeChange }: SidebarProps) {
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
       {/* Logo / Título */}
@@ -69,6 +71,16 @@ export function Sidebar({ currentView, onViewChange }: SidebarProps) {
           Servicios
         </button>
       </nav>
+
+      <button
+        type="button"
+        onClick={onThemeChange}
+        className="mx-4 mb-3 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+        aria-label={isDarkMode ? "Activar modo claro" : "Activar modo oscuro"}
+      >
+        <span>{isDarkMode ? "Modo claro" : "Modo oscuro"}</span>
+        {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
 
       {/* Estado inferior de sala */}
       <div className="p-4 border-t border-slate-100 m-4 bg-slate-50 rounded-xl flex items-center justify-between">

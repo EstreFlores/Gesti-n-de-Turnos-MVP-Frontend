@@ -27,13 +27,25 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [appointmentToEdit, setAppointmentToEdit] = useState<Appointment | null>(null);
   const [appointmentToCancel, setAppointmentToCancel] = useState<Appointment | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(() =>
+    window.localStorage.getItem("theme") === "dark"
+  );
   
   // Estado para controlar qué sección del menú lateral está activa
   const [currentView, setCurrentView] = useState<string>("dashboard");
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedDate, setSelectedDate] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<Appointment["status"] | "all">("all");
+  const [searchTerm, setSearchTerm] = useState(() => {
+    return new URLSearchParams(window.location.search).get("search") ?? "";
+  });
+  const [selectedDate, setSelectedDate] = useState(() => {
+    return new URLSearchParams(window.location.search).get("date") ?? "";
+  });
+  const [selectedStatus, setSelectedStatus] = useState<Appointment["status"] | "all">(() => {
+    const status = new URLSearchParams(window.location.search).get("status");
+    return status === "pending" || status === "confirmed" || status === "cancelled" || status === "completed"
+      ? status
+      : "all";
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const appointmentsPerPage = 5;
 
@@ -64,6 +76,26 @@ export default function App() {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDarkMode);
+    window.localStorage.setItem("theme", isDarkMode ? "dark" : "light");
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+
+    if (searchTerm) params.set("search", searchTerm);
+    if (selectedDate) params.set("date", selectedDate);
+    if (selectedStatus !== "all") params.set("status", selectedStatus);
+
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}`
+    );
+  }, [searchTerm, selectedDate, selectedStatus]);
 
   const loadData = async () => {
     setLoading(true);
@@ -235,7 +267,12 @@ export default function App() {
   return (
     <div className="flex min-h-screen bg-slate-50">
       {/* Sidebar Izquierdo con control de vista */}
-      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
+      <Sidebar
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        isDarkMode={isDarkMode}
+        onThemeChange={() => setIsDarkMode((current) => !current)}
+      />
 
       {/* Contenido Principal */}
       <main className="flex-1 p-8 overflow-y-auto">

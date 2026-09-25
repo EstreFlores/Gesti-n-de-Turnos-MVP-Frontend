@@ -94,8 +94,8 @@
     --card-foreground: oklch(0.985 0 0);
     --popover: oklch(0.205 0 0);
     --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
+    --primary: #e11d48;
+    --primary-foreground: #ffffff;
     --secondary: oklch(0.269 0 0);
     --secondary-foreground: oklch(0.985 0 0);
     --muted: oklch(0.269 0 0);
@@ -119,6 +119,45 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.556 0 0);
+}
+
+.dark .bg-slate-50 {
+    background-color: #0f172a;
+}
+
+.dark .bg-white {
+    background-color: #1e293b;
+}
+
+.dark .text-slate-900 {
+    color: #f8fafc;
+}
+
+.dark .text-slate-700,
+.dark .text-slate-600 {
+    color: #cbd5e1;
+}
+
+.dark .text-slate-500,
+.dark .text-slate-400 {
+    color: #94a3b8;
+}
+
+.dark .border-slate-100,
+.dark .border-slate-200 {
+    border-color: #334155;
+}
+
+.dark .hover\:bg-slate-50:hover {
+    background-color: #334155;
+}
+
+.dark input,
+.dark select,
+.dark textarea {
+    background-color: #1e293b;
+    color: #f8fafc;
+    border-color: #475569;
 }
 
 @layer base {

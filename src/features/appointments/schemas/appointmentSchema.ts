@@ -37,6 +37,25 @@ export const appointmentFormSchema = z.object({
   status: z
     .enum(["pending", "confirmed", "completed", "cancelled"])
     .default("pending"),
+}).superRefine(({ date, startTime }, context) => {
+  const now = new Date();
+  const appointmentDate = parseISO(date);
+
+  if (isBefore(appointmentDate, startOfToday())) {
+    return;
+  }
+
+  const [hours, minutes] = startTime.split(":").map(Number);
+  const appointmentDateTime = new Date(appointmentDate);
+  appointmentDateTime.setHours(hours, minutes, 0, 0);
+
+  if (appointmentDateTime <= now) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["startTime"],
+      message: "La hora de inicio debe ser futura.",
+    });
+  }
 });
 
 export type AppointmentFormValues = z.infer<typeof appointmentFormSchema>;
