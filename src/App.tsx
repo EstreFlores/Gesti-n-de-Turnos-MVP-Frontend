@@ -170,7 +170,7 @@ export default function App() {
           {/* Renderizado condicional según la opción seleccionada en el Sidebar */}
           {currentView === "dashboard" && (
             <>
-              <StatsCards />
+              <StatsCards appointments={appointments} services={services} />
               <section className="space-y-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
                 <div className="flex justify-between items-center">
                   <h2 className="text-lg font-bold text-slate-900">Listado de Citas Programadas</h2>
