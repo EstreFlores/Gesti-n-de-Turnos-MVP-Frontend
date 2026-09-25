@@ -1,6 +1,11 @@
 import { LayoutDashboard, CalendarDays, Calendar, Scissors } from "lucide-react";
 
-export function Sidebar() {
+interface SidebarProps {
+  currentView: string;
+  onViewChange: (view: string) => void;
+}
+
+export function Sidebar({ currentView, onViewChange }: SidebarProps) {
   return (
     <aside className="w-64 bg-white border-r border-slate-200 flex flex-col h-screen sticky top-0">
       {/* Logo / Título */}
@@ -16,34 +21,53 @@ export function Sidebar() {
 
       {/* Navegación */}
       <nav className="flex-1 p-4 space-y-1">
-        <a
-          href="#"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl bg-primary text-white font-medium text-sm shadow-sm"
+        <button
+          onClick={() => onViewChange("dashboard")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+            currentView === "dashboard"
+              ? "bg-primary text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
         >
           <LayoutDashboard size={18} />
           Dashboard
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 font-medium text-sm transition"
+        </button>
+
+        <button
+          onClick={() => onViewChange("appointments")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+            currentView === "appointments"
+              ? "bg-primary text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
         >
           <CalendarDays size={18} />
           Citas & Turnos
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 font-medium text-sm transition"
+        </button>
+
+        <button
+          onClick={() => onViewChange("calendar")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+            currentView === "calendar"
+              ? "bg-primary text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
         >
           <Calendar size={18} />
           Calendario Diario
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-600 hover:bg-slate-50 font-medium text-sm transition"
+        </button>
+
+        <button
+          onClick={() => onViewChange("services")}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-sm transition ${
+            currentView === "services"
+              ? "bg-primary text-white shadow-sm"
+              : "text-slate-600 hover:bg-slate-50"
+          }`}
         >
           <Scissors size={18} />
           Servicios
-        </a>
+        </button>
       </nav>
 
       {/* Estado inferior de sala */}

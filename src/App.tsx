@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { appointmentService } from "@/features/appointments/api/appointmentService";
 import type { Appointment, Service } from "@/types/appointment";
 import { AppointmentTable } from "@/components/AppointmentTable";
+import { AppointmentCalendar } from "@/components/AppointmentCalendar";
 import { Sidebar } from "@/components/Sidebar";
 import { StatsCards } from "@/components/StatsCards";
 import { AppointmentModal } from "@/components/AppointmentModal";
@@ -14,6 +15,10 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [appointmentToEdit, setAppointmentToEdit] = useState<Appointment | null>(null);
+  
+  // Estado para controlar qué sección del menú lateral está activa
+  const [currentView, setCurrentView] = useState<string>("dashboard");
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<Appointment["status"] | "all">("all");
@@ -85,27 +90,25 @@ export default function App() {
       console.error("Error al actualizar estado:", error);
     }
   };
-
   
   const handleDelete = async (id: string) => {
-  try {
-    await appointmentService.deleteAppointment(id);
-    setAppointments((prev) => prev.filter((apt) => apt.id !== id));
-    toast.add({
-      title: "Cita eliminada",
-      description: "La cita se eliminó correctamente.",
-      type: "success",
-    });
-  } catch (error) {
-    console.error("Error al eliminar cita:", error);
-    toast.add({
-      title: "No se pudo eliminar la cita",
-      description: "Ocurrió un error al intentar eliminarla.",
-      type: "error",
-    });
-  }
-};
-
+    try {
+      await appointmentService.deleteAppointment(id);
+      setAppointments((prev) => prev.filter((apt) => apt.id !== id));
+      toast.add({
+        title: "Cita eliminada",
+        description: "La cita se eliminó correctamente.",
+        type: "success",
+      });
+    } catch (error) {
+      console.error("Error al eliminar cita:", error);
+      toast.add({
+        title: "No se pudo eliminar la cita",
+        description: "Ocurrió un error al intentar eliminarla.",
+        type: "error",
+      });
+    }
+  };
 
   const handleEdit = (appointment: Appointment) => {
     setAppointmentToEdit(appointment);
@@ -122,14 +125,14 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* Sidebar Izquierdo */}
-      <Sidebar />
+      {/* Sidebar Izquierdo con control de vista */}
+      <Sidebar currentView={currentView} onViewChange={setCurrentView} />
 
       {/* Contenido Principal */}
       <main className="flex-1 p-8 overflow-y-auto">
         <div className="max-w-6xl mx-auto space-y-8">
           
-          {/* Header Superior */}
+          {/* Header */}
           <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold text-slate-400 mb-1">
@@ -140,13 +143,18 @@ export default function App() {
                 ¡Hola, Estre! 👋
               </h1>
               <p className="text-sm text-slate-500 mt-0.5">
-                Aquí tienes el resumen operativo y turnos programados para hoy.
+                {currentView === "calendar" 
+                  ? "Visualiza la agenda y disponibilidad horaria por profesional." 
+                  : "Aquí tienes el resumen operativo y turnos programados para hoy."}
               </p>
             </div>
 
             <div className="flex items-center gap-3">
               <button 
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => {
+                  setAppointmentToEdit(null);
+                  setIsModalOpen(true);
+                }}
                 className="bg-primary hover:bg-rose-700 text-white font-medium px-4 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-sm transition"
               >
                 <Plus size={18} />
@@ -159,39 +167,83 @@ export default function App() {
             </div>
           </header>
 
-          {/* Tarjetas de Resumen (KPIs) */}
-          <StatsCards />
+          {/* Renderizado condicional según la opción seleccionada en el Sidebar */}
+          {currentView === "dashboard" && (
+            <>
+              <StatsCards />
+              <section className="space-y-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-lg font-bold text-slate-900">Listado de Citas Programadas</h2>
+                  <span className="text-xs text-slate-400 font-medium">Actualizado en tiempo real</span>
+                </div>
+                
+                <AppointmentTable 
+                  appointments={paginatedAppointments}
+                  services={services}
+                  onStatusChange={handleStatusChange}
+                  onDelete={handleDelete}
+                  onEdit={handleEdit}
+                  searchTerm={searchTerm}
+                  selectedDate={selectedDate}
+                  selectedStatus={selectedStatus}
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalFilteredAppointments={filteredAppointments.length}
+                  onSearchChange={setSearchTerm}
+                  onDateChange={setSelectedDate}
+                  onStatusFilterChange={setSelectedStatus}
+                  onPageChange={setCurrentPage}
+                />
+              </section>
+            </>
+          )}
 
-          {/* Sección de la Tabla de Turnos */}
-          <section className="space-y-4 bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-slate-900">Listado de Citas Programadas</h2>
-              <span className="text-xs text-slate-400 font-medium">Actualizado en tiempo real</span>
+          {currentView === "appointments" && (
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+              <h2 className="text-lg font-bold text-slate-900 mb-4">Gestión General de Citas & Turnos</h2>
+              <AppointmentTable 
+                appointments={paginatedAppointments}
+                services={services}
+                onStatusChange={handleStatusChange}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
+                searchTerm={searchTerm}
+                selectedDate={selectedDate}
+                selectedStatus={selectedStatus}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                totalFilteredAppointments={filteredAppointments.length}
+                onSearchChange={setSearchTerm}
+                onDateChange={setSelectedDate}
+                onStatusFilterChange={setSelectedStatus}
+                onPageChange={setCurrentPage}
+              />
             </div>
-            
-            <AppointmentTable 
-              appointments={paginatedAppointments}
+          )}
+
+          {currentView === "calendar" && (
+            <AppointmentCalendar 
+              appointments={appointments}
               services={services}
-              onStatusChange={handleStatusChange}
-              onDelete={handleDelete}
-              onEdit={handleEdit}
-              searchTerm={searchTerm}
-              selectedDate={selectedDate}
-              selectedStatus={selectedStatus}
-              currentPage={currentPage}
-              totalPages={totalPages}
-              totalFilteredAppointments={filteredAppointments.length}
-              onSearchChange={setSearchTerm}
-              onDateChange={setSelectedDate}
-              onStatusFilterChange={setSelectedStatus}
-              onPageChange={setCurrentPage}
+              onNewAppointmentClick={() => {
+                setAppointmentToEdit(null);
+                setIsModalOpen(true);
+              }}
+              onSelectAppointment={handleEdit}
             />
-          </section>
+          )}
+
+          {currentView === "services" && (
+            <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm text-center py-12">
+              <h2 className="text-lg font-bold text-slate-900">Módulo de Servicios</h2>
+              <p className="text-slate-500 text-sm mt-1">Próximamente administración de catálogos y precios.</p>
+            </div>
+          )}
 
         </div>
       </main>
 
-      {/* Modal de Nueva Cita  */}
+      {/* Modal de  Edición de Cita */}
       <AppointmentModal
         isOpen={isModalOpen}
         onClose={() => {
