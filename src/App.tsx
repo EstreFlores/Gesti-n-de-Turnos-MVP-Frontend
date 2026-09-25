@@ -8,6 +8,15 @@ import { StatsCards } from "@/components/StatsCards";
 import { AppointmentModal } from "@/components/AppointmentModal";
 import { Plus, Calendar as CalendarIcon, User } from "lucide-react";
 import { toast } from "@/components/ui/toast";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function App() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -15,6 +24,7 @@ export default function App() {
   const [loading, setLoading] = useState<boolean>(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [appointmentToEdit, setAppointmentToEdit] = useState<Appointment | null>(null);
+  const [appointmentToCancel, setAppointmentToCancel] = useState<Appointment | null>(null);
   
   // Estado para controlar qué sección del menú lateral está activa
   const [currentView, setCurrentView] = useState<string>("dashboard");
@@ -81,14 +91,66 @@ export default function App() {
   };
 
   const handleStatusChange = async (id: string, newStatus: Appointment["status"]) => {
+    if (newStatus === "cancelled") {
+      const appointment = appointments.find((apt) => apt.id === id);
+
+      if (!appointment) {
+        return;
+      }
+
+      setAppointmentToCancel(appointment);
+      return;
+    }
+
+    await updateAppointmentStatus(id, newStatus);
+  };
+
+  const updateAppointmentStatus = async (id: string, newStatus: Appointment["status"]) => {
+    const previousAppointment = appointments.find((apt) => apt.id === id);
+
+    if (!previousAppointment) {
+      return;
+    }
+
+    setAppointments((prev) =>
+      prev.map((apt) =>
+        apt.id === id
+          ? { ...apt, status: newStatus, updatedAt: new Date().toISOString() }
+          : apt
+      )
+    );
+
     try {
       const updated = await appointmentService.updateAppointmentStatus(id, newStatus);
       setAppointments((prev) =>
         prev.map((apt) => (apt.id === id ? updated : apt))
       );
+      toast.add({
+        title: "Estado actualizado",
+        description: `La cita de ${previousAppointment.clientName} ahora está ${newStatus === "confirmed" ? "confirmada" : newStatus === "completed" ? "completada" : "cancelada"}.`,
+        type: "success",
+      });
     } catch (error) {
       console.error("Error al actualizar estado:", error);
+      setAppointments((prev) =>
+        prev.map((apt) => (apt.id === id ? previousAppointment : apt))
+      );
+      toast.add({
+        title: "No se pudo actualizar el estado",
+        description: "La cita volvió a su estado anterior porque ocurrió un error.",
+        type: "error",
+      });
     }
+  };
+
+  const confirmCancellation = async () => {
+    if (!appointmentToCancel) {
+      return;
+    }
+
+    const appointmentId = appointmentToCancel.id;
+    setAppointmentToCancel(null);
+    await updateAppointmentStatus(appointmentId, "cancelled");
   };
   
   const handleDelete = async (id: string) => {
@@ -255,6 +317,37 @@ export default function App() {
         appointmentToEdit={appointmentToEdit}
         onAppointmentCreated={refreshAppointments}
       />
+
+      <Dialog
+        open={Boolean(appointmentToCancel)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAppointmentToCancel(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>¿Cancelar esta cita?</DialogTitle>
+            <DialogDescription>
+              {appointmentToCancel
+                ? `Se cancelará la cita de ${appointmentToCancel.clientName}. Esta acción cambiará su estado a cancelada.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAppointmentToCancel(null)}
+            >
+              Volver
+            </Button>
+            <Button variant="destructive" onClick={confirmCancellation}>
+              Confirmar cancelación
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
