@@ -13,8 +13,18 @@ interface AppointmentModalProps {
   services: Service[];
   existingAppointments: Appointment[];
   appointmentToEdit?: Appointment | null;
-  //onAppointmentCreated: () => void;
-  onAppointmentCreated: () => void;
+  onAppointmentOptimisticUpdate: (
+    nextAppointment: Appointment,
+    previousAppointment: Appointment | null
+  ) => void;
+  onAppointmentPersistenceSuccess: (
+    optimisticId: string,
+    persistedAppointment: Appointment
+  ) => void;
+  onAppointmentPersistenceError: (
+    optimisticId: string,
+    previousAppointment: Appointment | null
+  ) => void;
 }
 
 const PROFESSIONALS = [
@@ -30,7 +40,9 @@ export function AppointmentModal({
   services, 
   existingAppointments, 
   appointmentToEdit,
-  onAppointmentCreated 
+  onAppointmentOptimisticUpdate,
+  onAppointmentPersistenceSuccess,
+  onAppointmentPersistenceError,
 }: AppointmentModalProps) {
   const [loading, setLoading] = useState(false);
   const [professional, setProfessional] = useState(PROFESSIONALS[0]);
@@ -118,11 +130,11 @@ export function AppointmentModal({
     return existingAppointments.find((apt) => {
       if (apt.id === appointmentToEdit?.id) return false;
       if (apt.date !== watchedDate) return false;
+      if (apt.status === "cancelled") return false;
       
       const [aptH, aptM] = apt.startTime.split(":").map(Number);
       const aptStartTotal = aptH * 60 + aptM;
-      const aptDuration = services.find((s) => s.id === apt.serviceId)?.durationMinutes || 45;
-      const aptEndTotal = aptStartTotal + aptDuration;
+      const aptEndTotal = aptStartTotal + apt.durationMinutes;
 
       return newStartTotal < aptEndTotal && newEndTotal > aptStartTotal;
     });
@@ -140,6 +152,8 @@ export function AppointmentModal({
       return;
     }
 
+    const optimisticId = appointmentToEdit?.id ?? `optimistic-${crypto.randomUUID()}`;
+
     try {
       setLoading(true);
       const notes = `${data.notes || ""} [Profesional: ${professional}]`.trim();
@@ -148,16 +162,31 @@ export function AppointmentModal({
         durationMinutes,
         notes,
       };
+      const optimisticAppointment: Appointment = {
+        ...(appointmentToEdit ?? {
+          id: optimisticId,
+          createdAt: new Date().toISOString(),
+        }),
+        ...appointmentData,
+        id: optimisticId,
+        updatedAt: new Date().toISOString(),
+      };
+
+      onAppointmentOptimisticUpdate(optimisticAppointment, appointmentToEdit ?? null);
+      reset();
+      onClose();
 
       if (appointmentToEdit) {
-        await appointmentService.updateAppointment(appointmentToEdit.id, appointmentData);
+        const updatedAppointment = await appointmentService.updateAppointment(
+          appointmentToEdit.id,
+          appointmentData
+        );
+        onAppointmentPersistenceSuccess(optimisticId, updatedAppointment);
       } else {
-        await appointmentService.createAppointment(appointmentData);
+        const createdAppointment = await appointmentService.createAppointment(appointmentData);
+        onAppointmentPersistenceSuccess(optimisticId, createdAppointment);
       }
 
-      reset();
-      onAppointmentCreated();
-      onClose();
       toast.add({
         title: appointmentToEdit ? "Cita actualizada" : "Cita creada",
         description: appointmentToEdit
@@ -167,6 +196,7 @@ export function AppointmentModal({
       });
     } catch (error) {
       console.error("Error al guardar la cita:", error);
+      onAppointmentPersistenceError(optimisticId, appointmentToEdit ?? null);
       toast.add({
         title: "No se pudo guardar la cita",
         description: "Ocurrió un error al comunicarse con la API.",
@@ -279,6 +309,26 @@ export function AppointmentModal({
                 </select>
               </div>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
+              Estado de la cita *
+            </label>
+            <select
+              {...register("status")}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
+            >
+              <option value="pending">Pendiente</option>
+              <option value="confirmed">Confirmada</option>
+              <option value="completed">Completada</option>
+              <option value="cancelled">Cancelada</option>
+            </select>
+            {errors.status && (
+              <span className="text-[11px] text-rose-500 font-medium mt-1 block">
+                {String(errors.status.message)}
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

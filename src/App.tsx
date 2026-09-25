@@ -120,13 +120,45 @@ export default function App() {
     loadData();
   }, []);
 
-  const refreshAppointments = async () => {
-    try {
-      const fetchedAppointments = await appointmentService.getAppointments();
-      setAppointments(fetchedAppointments);
-    } catch (error) {
-      console.error("Error al refrescar citas:", error);
-    }
+  const handleAppointmentOptimisticUpdate = (
+    nextAppointment: Appointment,
+    previousAppointment: Appointment | null
+  ) => {
+    setAppointments((prev) => {
+      if (previousAppointment) {
+        return prev.map((appointment) =>
+          appointment.id === previousAppointment.id ? nextAppointment : appointment
+        );
+      }
+
+      return [...prev, nextAppointment];
+    });
+  };
+
+  const handleAppointmentPersistenceSuccess = (
+    optimisticId: string,
+    persistedAppointment: Appointment
+  ) => {
+    setAppointments((prev) =>
+      prev.map((appointment) =>
+        appointment.id === optimisticId ? persistedAppointment : appointment
+      )
+    );
+  };
+
+  const handleAppointmentPersistenceError = (
+    optimisticId: string,
+    previousAppointment: Appointment | null
+  ) => {
+    setAppointments((prev) => {
+      if (previousAppointment) {
+        return prev.map((appointment) =>
+          appointment.id === optimisticId ? previousAppointment : appointment
+        );
+      }
+
+      return prev.filter((appointment) => appointment.id !== optimisticId);
+    });
   };
 
   const handleStatusChange = async (id: string, newStatus: Appointment["status"]) => {
@@ -399,7 +431,9 @@ export default function App() {
         services={services}
         existingAppointments={appointments}
         appointmentToEdit={appointmentToEdit}
-        onAppointmentCreated={refreshAppointments}
+        onAppointmentOptimisticUpdate={handleAppointmentOptimisticUpdate}
+        onAppointmentPersistenceSuccess={handleAppointmentPersistenceSuccess}
+        onAppointmentPersistenceError={handleAppointmentPersistenceError}
       />
 
       <Dialog
