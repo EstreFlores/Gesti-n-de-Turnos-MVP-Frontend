@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Trash2, Edit, Clock, Phone } from "lucide-react";
 
 interface AppointmentTableProps {
   appointments: Appointment[];
@@ -98,111 +99,104 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
           </p>
         </div>
       ) : (
-        <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead>Servicio</TableHead>
-                <TableHead>Fecha y Hora</TableHead>
-                <TableHead>Duración</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {appointments.map((apt) => {
-                const currentStatus = statusConfig[apt.status];
-                return (
-                  <TableRow key={apt.id}>
-                    <TableCell className="font-medium">
-                      <div>{apt.clientName}</div>
+        <>
+          {/* DESKTOP: Tabla */}
+          <div className="border rounded-lg overflow-hidden bg-white shadow-sm hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Servicio</TableHead>
+                  <TableHead>Fecha y Hora</TableHead>
+                  <TableHead>Duración</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {appointments.map((apt) => {
+                  const currentStatus = statusConfig[apt.status];
+                  return (
+                    <TableRow key={apt.id}>
+                      <TableCell className="font-medium">
+                        <div>{apt.clientName}</div>
+                        {apt.clientPhone && (
+                          <div className="text-xs text-muted-foreground">{apt.clientPhone}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>{getServiceName(apt.serviceId)}</TableCell>
+                      <TableCell>
+                        <div className="text-sm font-semibold">{apt.date}</div>
+                        <div className="text-xs text-muted-foreground">{apt.startTime} hrs</div>
+                      </TableCell>
+                      <TableCell>{apt.durationMinutes} min</TableCell>
+                      <TableCell>
+                        <Badge variant={currentStatus.variant}>{currentStatus.label}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right space-x-2">
+                        {apt.status === "pending" && (
+                          <Button size="sm" variant="outline" onClick={() => onStatusChange(apt.id, "confirmed")}>Confirmar</Button>
+                        )}
+                        {apt.status === "confirmed" && (
+                          <Button size="sm" variant="outline" onClick={() => onStatusChange(apt.id, "completed")}>Completar</Button>
+                        )}
+                        {(apt.status === "pending" || apt.status === "confirmed") && (
+                          <Button size="sm" variant="destructive" onClick={() => onStatusChange(apt.id, "cancelled")}>Cancelar</Button>
+                        )}
+                        <Button size="sm" variant="destructive" onClick={() => onDelete(apt.id)}>Eliminar</Button>
+                        <Button size="sm" variant="outline" onClick={() => onEdit(apt)}>Editar</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* MÓVIL: Cards */}
+          <div className="grid grid-cols-1 gap-3 md:hidden">
+            {appointments.map((apt) => {
+              const currentStatus = statusConfig[apt.status];
+              return (
+                <div key={apt.id} className="border border-slate-200 rounded-lg bg-white p-4 shadow-sm">
+                  <div className="flex justify-between items-start gap-2 mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-bold text-slate-900">{apt.clientName}</h3>
                       {apt.clientPhone && (
-                        <div className="text-xs text-muted-foreground">{apt.clientPhone}</div>
+                        <div className="flex items-center gap-1 text-xs text-slate-500 mt-1">
+                          <Phone size={12} /> {apt.clientPhone}
+                        </div>
                       )}
-                    </TableCell>
-                    <TableCell>{getServiceName(apt.serviceId)}</TableCell>
-                    <TableCell>
-                      <div className="text-sm font-semibold">{apt.date}</div>
-                      <div className="text-xs text-muted-foreground">{apt.startTime} hrs</div>
-                    </TableCell>
-                    <TableCell>{apt.durationMinutes} min</TableCell>
-                    <TableCell>
-                      <Badge variant={currentStatus.variant}>{currentStatus.label}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      {apt.status === "pending" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onStatusChange(apt.id, "confirmed")}
-                        >
-                          Confirmar
-                        </Button>
-                      )}
-                      {apt.status === "confirmed" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onStatusChange(apt.id, "completed")}
-                        >
-                          Completar
-                        </Button>
-                      )}
-                      {(apt.status === "pending" || apt.status === "confirmed") && (
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => onStatusChange(apt.id, "cancelled")}
-                        >
-                          Cancelar
-                        </Button>
-                      )}
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => onDelete(apt.id)}
-                      >
-                        Eliminar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onEdit(apt)}
-                      >
-                        Editar
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+                    </div>
+                    <Badge variant={currentStatus.variant}>{currentStatus.label}</Badge>
+                  </div>
+
+                  <div className="space-y-2 text-sm mb-4">
+                    <div><span className="font-medium">Servicio:</span> {getServiceName(apt.serviceId)}</div>
+                    <div className="flex items-center gap-2"><Clock size={14} /> {apt.date} a las {apt.startTime}</div>
+                    <div><span className="font-medium">Duración:</span> {apt.durationMinutes} min</div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {apt.status === "pending" && <Button size="sm" variant="outline" onClick={() => onStatusChange(apt.id, "confirmed")} className="flex-1 text-xs">Confirmar</Button>}
+                    {apt.status === "confirmed" && <Button size="sm" variant="outline" onClick={() => onStatusChange(apt.id, "completed")} className="flex-1 text-xs">Completar</Button>}
+                    {(apt.status === "pending" || apt.status === "confirmed") && <Button size="sm" variant="destructive" onClick={() => onStatusChange(apt.id, "cancelled")} className="flex-1 text-xs">Cancelar</Button>}
+                    <Button size="sm" variant="outline" onClick={() => onEdit(apt)} className="flex-1 text-xs"><Edit size={14} /></Button>
+                    <Button size="sm" variant="destructive" onClick={() => onDelete(apt.id)} className="flex-1 text-xs"><Trash2 size={14} /></Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">
-            Página {currentPage} de {totalPages} ({totalFilteredAppointments} citas)
-          </span>
+          <span className="text-sm text-muted-foreground">Página {currentPage} de {totalPages} ({totalFilteredAppointments} citas)</span>
           <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={currentPage === 1}
-              onClick={() => onPageChange(currentPage - 1)}
-            >
-              Anterior
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={currentPage === totalPages}
-              onClick={() => onPageChange(currentPage + 1)}
-            >
-              Siguiente
-            </Button>
+            <Button size="sm" variant="outline" disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)}>Anterior</Button>
+            <Button size="sm" variant="outline" disabled={currentPage === totalPages} onClick={() => onPageChange(currentPage + 1)}>Siguiente</Button>
           </div>
         </div>
       )}
