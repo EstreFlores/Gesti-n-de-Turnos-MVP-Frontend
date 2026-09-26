@@ -3,7 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Appointment, Service } from "@/types/appointment";
 import { appointmentFormSchema, type AppointmentFormValues } from "@/features/appointments/schemas/appointmentSchema";
-import { appointmentService } from "@/features/appointments/api/appointmentService";
 import { toast } from "@/components/ui/toast";
 import { X, Calendar, Clock, User, Phone, Scissors, AlertCircle, CheckCircle2 } from "lucide-react";
 
@@ -13,16 +12,8 @@ interface AppointmentModalProps {
   services: Service[];
   existingAppointments: Appointment[];
   appointmentToEdit?: Appointment | null;
-  onAppointmentOptimisticUpdate: (
+  onSaveAppointment: (
     nextAppointment: Appointment,
-    previousAppointment: Appointment | null
-  ) => void;
-  onAppointmentPersistenceSuccess: (
-    optimisticId: string,
-    persistedAppointment: Appointment
-  ) => void;
-  onAppointmentPersistenceError: (
-    optimisticId: string,
     previousAppointment: Appointment | null
   ) => void;
 }
@@ -40,11 +31,8 @@ export function AppointmentModal({
   services, 
   existingAppointments, 
   appointmentToEdit,
-  onAppointmentOptimisticUpdate,
-  onAppointmentPersistenceSuccess,
-  onAppointmentPersistenceError,
+  onSaveAppointment,
 }: AppointmentModalProps) {
-  const [loading, setLoading] = useState(false);
   const [professional, setProfessional] = useState(PROFESSIONALS[0]);
 
   
@@ -142,7 +130,7 @@ export function AppointmentModal({
 
   if (!isOpen) return null;
 
-  const onSubmit = async (data: AppointmentFormValues) => {
+  const onSubmit = (data: AppointmentFormValues) => {
     if (overlapConflict) {
       toast.add({
         title: "Horario no disponible",
@@ -153,58 +141,22 @@ export function AppointmentModal({
     }
 
     const optimisticId = appointmentToEdit?.id ?? `optimistic-${crypto.randomUUID()}`;
-
-    try {
-      setLoading(true);
-      const notes = `${data.notes || ""} [Profesional: ${professional}]`.trim();
-      const appointmentData = {
-        ...data,
-        durationMinutes,
-        notes,
-      };
-      const optimisticAppointment: Appointment = {
-        ...(appointmentToEdit ?? {
-          id: optimisticId,
-          createdAt: new Date().toISOString(),
-        }),
-        ...appointmentData,
+    const notes = `${data.notes || ""} [Profesional: ${professional}]`.trim();
+    const optimisticAppointment: Appointment = {
+      ...(appointmentToEdit ?? {
         id: optimisticId,
-        updatedAt: new Date().toISOString(),
-      };
+        createdAt: new Date().toISOString(),
+      }),
+      ...data,
+      durationMinutes,
+      notes,
+      id: optimisticId,
+      updatedAt: new Date().toISOString(),
+    };
 
-      onAppointmentOptimisticUpdate(optimisticAppointment, appointmentToEdit ?? null);
-      reset();
-      onClose();
-
-      if (appointmentToEdit) {
-        const updatedAppointment = await appointmentService.updateAppointment(
-          appointmentToEdit.id,
-          appointmentData
-        );
-        onAppointmentPersistenceSuccess(optimisticId, updatedAppointment);
-      } else {
-        const createdAppointment = await appointmentService.createAppointment(appointmentData);
-        onAppointmentPersistenceSuccess(optimisticId, createdAppointment);
-      }
-
-      toast.add({
-        title: appointmentToEdit ? "Cita actualizada" : "Cita creada",
-        description: appointmentToEdit
-          ? "Los datos de la cita se actualizaron correctamente."
-          : "La cita se registró correctamente.",
-        type: "success",
-      });
-    } catch (error) {
-      console.error("Error al guardar la cita:", error);
-      onAppointmentPersistenceError(optimisticId, appointmentToEdit ?? null);
-      toast.add({
-        title: "No se pudo guardar la cita",
-        description: "Ocurrió un error al comunicarse con la API.",
-        type: "error",
-      });
-    } finally {
-      setLoading(false);
-    }
+    onSaveAppointment(optimisticAppointment, appointmentToEdit ?? null);
+    reset();
+    onClose();
   };
 
   return (
@@ -421,10 +373,10 @@ export function AppointmentModal({
               </button>
               <button 
                 type="submit"
-                disabled={loading || Boolean(overlapConflict)}
+                disabled={Boolean(overlapConflict)}
                 className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-primary hover:bg-rose-700 shadow-sm transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? "Guardando..." : appointmentToEdit ? "Guardar Cambios" : "Confirmar y Guardar Turno"}
+                {appointmentToEdit ? "Guardar Cambios" : "Confirmar y Guardar Turno"}
               </button>
             </div>
           </div>

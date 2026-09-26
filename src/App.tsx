@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { appointmentService } from "@/features/appointments/api/appointmentService";
 import type { Appointment, Service } from "@/types/appointment";
 import { AppointmentTable } from "@/components/AppointmentTable";
@@ -19,11 +20,27 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+const APPOINTMENTS_QUERY_KEY = ["appointments"] as const;
+const SERVICES_QUERY_KEY = ["services"] as const;
+const EMPTY_APPOINTMENTS: Appointment[] = [];
+const EMPTY_SERVICES: Service[] = [];
+
 export default function App() {
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const appointmentsQuery = useQuery({
+    queryKey: APPOINTMENTS_QUERY_KEY,
+    queryFn: appointmentService.getAppointments,
+  });
+  const servicesQuery = useQuery({
+    queryKey: SERVICES_QUERY_KEY,
+    queryFn: appointmentService.getServices,
+  });
+  const appointments = appointmentsQuery.data ?? EMPTY_APPOINTMENTS;
+  const services = servicesQuery.data ?? EMPTY_SERVICES;
+  const loading = appointmentsQuery.isLoading || servicesQuery.isLoading;
+  const loadError =
+    (appointmentsQuery.isError && !appointmentsQuery.data) ||
+    (servicesQuery.isError && !servicesQuery.data);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [appointmentToEdit, setAppointmentToEdit] = useState<Appointment | null>(null);
   const [appointmentToCancel, setAppointmentToCancel] = useState<Appointment | null>(null);
@@ -62,20 +79,24 @@ export default function App() {
   }, [appointments, searchTerm, selectedDate, selectedStatus]);
 
   const totalPages = Math.max(1, Math.ceil(filteredAppointments.length / appointmentsPerPage));
+  const displayedPage = Math.min(currentPage, totalPages);
   const paginatedAppointments = filteredAppointments.slice(
-    (currentPage - 1) * appointmentsPerPage,
-    currentPage * appointmentsPerPage
+    (displayedPage - 1) * appointmentsPerPage,
+    displayedPage * appointmentsPerPage
   );
 
-  useEffect(() => {
+  const updateSearchTerm = (value: string) => {
+    setSearchTerm(value);
     setCurrentPage(1);
-  }, [searchTerm, selectedDate, selectedStatus]);
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
+  };
+  const updateSelectedDate = (value: string) => {
+    setSelectedDate(value);
+    setCurrentPage(1);
+  };
+  const updateSelectedStatus = (value: Appointment["status"] | "all") => {
+    setSelectedStatus(value);
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDarkMode);
@@ -97,71 +118,193 @@ export default function App() {
     );
   }, [searchTerm, selectedDate, selectedStatus]);
 
-  const loadData = async () => {
-    setLoading(true);
-    setLoadError(null);
-
-    try {
-      const [fetchedAppointments, fetchedServices] = await Promise.all([
-        appointmentService.getAppointments(),
-        appointmentService.getServices(),
+  const createAppointmentMutation = useMutation({
+    mutationFn: async (optimisticAppointment: Appointment) => {
+      return appointmentService.createAppointment({
+        clientName: optimisticAppointment.clientName,
+        clientPhone: optimisticAppointment.clientPhone,
+        serviceId: optimisticAppointment.serviceId,
+        date: optimisticAppointment.date,
+        startTime: optimisticAppointment.startTime,
+        status: optimisticAppointment.status,
+        notes: optimisticAppointment.notes,
+      });
+    },
+    onMutate: async (optimisticAppointment) => {
+      await queryClient.cancelQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
+      const previousAppointments = queryClient.getQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY);
+      queryClient.setQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY, (current) => [
+        ...(current ?? []),
+        optimisticAppointment,
       ]);
-      setAppointments(fetchedAppointments);
-      setServices(fetchedServices);
-    } catch (error) {
-      console.error("Error al cargar los datos de la API:", error);
-      setLoadError("No pudimos cargar las citas. Revisa tu conexión e inténtalo nuevamente.");
-    } finally {
-      setLoading(false);
-    }
-  };
+      return { previousAppointments };
+    },
+    onSuccess: (createdAppointment, optimisticAppointment) => {
+      queryClient.setQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY, (current) =>
+        current?.map((appointment) =>
+          appointment.id === optimisticAppointment.id ? createdAppointment : appointment
+        )
+      );
+      toast.add({
+        title: "Cita creada",
+        description: "La cita se registró correctamente.",
+        type: "success",
+      });
+    },
+    onError: (error, _optimisticAppointment, context) => {
+      console.error("Error al crear la cita:", error);
+      if (context?.previousAppointments) {
+        queryClient.setQueryData(APPOINTMENTS_QUERY_KEY, context.previousAppointments);
+      }
+      toast.add({
+        title: "No se pudo crear la cita",
+        description: "Ocurrió un error al comunicarse con la API.",
+        type: "error",
+      });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY }),
+  });
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const editAppointmentMutation = useMutation({
+    mutationFn: async ({
+      nextAppointment,
+    }: {
+      nextAppointment: Appointment;
+      previousAppointment: Appointment;
+    }) => {
+      return appointmentService.updateAppointment(nextAppointment.id, {
+        clientName: nextAppointment.clientName,
+        clientPhone: nextAppointment.clientPhone,
+        serviceId: nextAppointment.serviceId,
+        date: nextAppointment.date,
+        startTime: nextAppointment.startTime,
+        durationMinutes: nextAppointment.durationMinutes,
+        status: nextAppointment.status,
+        notes: nextAppointment.notes,
+      });
+    },
+    onMutate: async ({ nextAppointment }) => {
+      await queryClient.cancelQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
+      const previousAppointments = queryClient.getQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY);
+      queryClient.setQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY, (current) =>
+        current?.map((appointment) =>
+          appointment.id === nextAppointment.id ? nextAppointment : appointment
+        )
+      );
+      return { previousAppointments };
+    },
+    onSuccess: (updatedAppointment) => {
+      queryClient.setQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY, (current) =>
+        current?.map((appointment) =>
+          appointment.id === updatedAppointment.id ? updatedAppointment : appointment
+        )
+      );
+      toast.add({
+        title: "Cita actualizada",
+        description: "Los datos de la cita se actualizaron correctamente.",
+        type: "success",
+      });
+    },
+    onError: (error, _variables, context) => {
+      console.error("Error al actualizar la cita:", error);
+      if (context?.previousAppointments) {
+        queryClient.setQueryData(APPOINTMENTS_QUERY_KEY, context.previousAppointments);
+      }
+      toast.add({
+        title: "No se pudo actualizar la cita",
+        description: "Los datos se restauraron porque ocurrió un error al guardar.",
+        type: "error",
+      });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY }),
+  });
 
-  const handleAppointmentOptimisticUpdate = (
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: Appointment["status"] }) =>
+      appointmentService.updateAppointmentStatus(id, status),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
+      const previousAppointments = queryClient.getQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY);
+      queryClient.setQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY, (current) =>
+        current?.map((appointment) =>
+          appointment.id === id
+            ? { ...appointment, status, updatedAt: new Date().toISOString() }
+            : appointment
+        )
+      );
+      return { previousAppointments };
+    },
+    onSuccess: (updatedAppointment) => {
+      queryClient.setQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY, (current) =>
+        current?.map((appointment) =>
+          appointment.id === updatedAppointment.id ? updatedAppointment : appointment
+        )
+      );
+      toast.add({
+        title: "Estado actualizado",
+        description: `La cita de ${updatedAppointment.clientName} ahora está ${updatedAppointment.status === "confirmed" ? "confirmada" : updatedAppointment.status === "completed" ? "completada" : "cancelada"}.`,
+        type: "success",
+      });
+    },
+    onError: (error, _variables, context) => {
+      console.error("Error al actualizar el estado:", error);
+      if (context?.previousAppointments) {
+        queryClient.setQueryData(APPOINTMENTS_QUERY_KEY, context.previousAppointments);
+      }
+      toast.add({
+        title: "No se pudo actualizar el estado",
+        description: "La cita volvió a su estado anterior porque ocurrió un error.",
+        type: "error",
+      });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY }),
+  });
+
+  const deleteAppointmentMutation = useMutation({
+    mutationFn: (appointment: Appointment) =>
+      appointmentService.deleteAppointment(appointment.id),
+    onMutate: async (appointment) => {
+      await queryClient.cancelQueries({ queryKey: APPOINTMENTS_QUERY_KEY });
+      const previousAppointments = queryClient.getQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY);
+      queryClient.setQueryData<Appointment[]>(APPOINTMENTS_QUERY_KEY, (current) =>
+        current?.filter((item) => item.id !== appointment.id)
+      );
+      return { previousAppointments };
+    },
+    onSuccess: (_result, appointment) => {
+      toast.add({
+        title: "Cita eliminada",
+        description: `La cita de ${appointment.clientName} se eliminó correctamente.`,
+        type: "success",
+      });
+    },
+    onError: (error, _appointment, context) => {
+      console.error("Error al eliminar la cita:", error);
+      if (context?.previousAppointments) {
+        queryClient.setQueryData(APPOINTMENTS_QUERY_KEY, context.previousAppointments);
+      }
+      toast.add({
+        title: "No se pudo eliminar la cita",
+        description: "La cita volvió a aparecer porque ocurrió un error al eliminarla.",
+        type: "error",
+      });
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: APPOINTMENTS_QUERY_KEY }),
+  });
+
+  const handleSaveAppointment = (
     nextAppointment: Appointment,
     previousAppointment: Appointment | null
   ) => {
-    setAppointments((prev) => {
-      if (previousAppointment) {
-        return prev.map((appointment) =>
-          appointment.id === previousAppointment.id ? nextAppointment : appointment
-        );
-      }
+    if (previousAppointment) {
+      editAppointmentMutation.mutate({ nextAppointment, previousAppointment });
+      return;
+    }
 
-      return [...prev, nextAppointment];
-    });
+    createAppointmentMutation.mutate(nextAppointment);
   };
 
-  const handleAppointmentPersistenceSuccess = (
-    optimisticId: string,
-    persistedAppointment: Appointment
-  ) => {
-    setAppointments((prev) =>
-      prev.map((appointment) =>
-        appointment.id === optimisticId ? persistedAppointment : appointment
-      )
-    );
-  };
-
-  const handleAppointmentPersistenceError = (
-    optimisticId: string,
-    previousAppointment: Appointment | null
-  ) => {
-    setAppointments((prev) => {
-      if (previousAppointment) {
-        return prev.map((appointment) =>
-          appointment.id === optimisticId ? previousAppointment : appointment
-        );
-      }
-
-      return prev.filter((appointment) => appointment.id !== optimisticId);
-    });
-  };
-
-  const handleStatusChange = async (id: string, newStatus: Appointment["status"]) => {
+  const handleStatusChange = (id: string, newStatus: Appointment["status"]) => {
     if (newStatus === "cancelled") {
       const appointment = appointments.find((apt) => apt.id === id);
 
@@ -173,45 +316,11 @@ export default function App() {
       return;
     }
 
-    await updateAppointmentStatus(id, newStatus);
+    updateAppointmentStatus(id, newStatus);
   };
 
-  const updateAppointmentStatus = async (id: string, newStatus: Appointment["status"]) => {
-    const previousAppointment = appointments.find((apt) => apt.id === id);
-
-    if (!previousAppointment) {
-      return;
-    }
-
-    setAppointments((prev) =>
-      prev.map((apt) =>
-        apt.id === id
-          ? { ...apt, status: newStatus, updatedAt: new Date().toISOString() }
-          : apt
-      )
-    );
-
-    try {
-      const updated = await appointmentService.updateAppointmentStatus(id, newStatus);
-      setAppointments((prev) =>
-        prev.map((apt) => (apt.id === id ? updated : apt))
-      );
-      toast.add({
-        title: "Estado actualizado",
-        description: `La cita de ${previousAppointment.clientName} ahora está ${newStatus === "confirmed" ? "confirmada" : newStatus === "completed" ? "completada" : "cancelada"}.`,
-        type: "success",
-      });
-    } catch (error) {
-      console.error("Error al actualizar estado:", error);
-      setAppointments((prev) =>
-        prev.map((apt) => (apt.id === id ? previousAppointment : apt))
-      );
-      toast.add({
-        title: "No se pudo actualizar el estado",
-        description: "La cita volvió a su estado anterior porque ocurrió un error.",
-        type: "error",
-      });
-    }
+  const updateAppointmentStatus = (id: string, status: Appointment["status"]) => {
+    updateStatusMutation.mutate({ id, status });
   };
 
   const confirmCancellation = async () => {
@@ -221,25 +330,13 @@ export default function App() {
 
     const appointmentId = appointmentToCancel.id;
     setAppointmentToCancel(null);
-    await updateAppointmentStatus(appointmentId, "cancelled");
+    updateAppointmentStatus(appointmentId, "cancelled");
   };
   
-  const handleDelete = async (id: string) => {
-    try {
-      await appointmentService.deleteAppointment(id);
-      setAppointments((prev) => prev.filter((apt) => apt.id !== id));
-      toast.add({
-        title: "Cita eliminada",
-        description: "La cita se eliminó correctamente.",
-        type: "success",
-      });
-    } catch (error) {
-      console.error("Error al eliminar cita:", error);
-      toast.add({
-        title: "No se pudo eliminar la cita",
-        description: "Ocurrió un error al intentar eliminarla.",
-        type: "error",
-      });
+  const handleDelete = (id: string) => {
+    const appointment = appointments.find((item) => item.id === id);
+    if (appointment) {
+      deleteAppointmentMutation.mutate(appointment);
     }
   };
 
@@ -287,8 +384,15 @@ export default function App() {
       <div className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
         <div className="w-full max-w-md rounded-2xl border border-red-100 bg-white p-8 text-center shadow-sm">
           <h1 className="text-lg font-bold text-slate-900">No se pudo cargar el panel</h1>
-          <p className="mt-2 text-sm text-slate-500">{loadError}</p>
-          <Button className="mt-6" onClick={loadData}>
+          <p className="mt-2 text-sm text-slate-500">
+            No pudimos cargar las citas o los servicios. Revisa tu conexión e inténtalo nuevamente.
+          </p>
+          <Button
+            className="mt-6"
+            onClick={() => {
+              void Promise.all([appointmentsQuery.refetch(), servicesQuery.refetch()]);
+            }}
+          >
             Reintentar
           </Button>
         </div>
@@ -364,12 +468,12 @@ export default function App() {
                   searchTerm={searchTerm}
                   selectedDate={selectedDate}
                   selectedStatus={selectedStatus}
-                  currentPage={currentPage}
+                  currentPage={displayedPage}
                   totalPages={totalPages}
                   totalFilteredAppointments={filteredAppointments.length}
-                  onSearchChange={setSearchTerm}
-                  onDateChange={setSelectedDate}
-                  onStatusFilterChange={setSelectedStatus}
+                  onSearchChange={updateSearchTerm}
+                  onDateChange={updateSelectedDate}
+                  onStatusFilterChange={updateSelectedStatus}
                   onPageChange={setCurrentPage}
                 />
               </section>
@@ -388,12 +492,12 @@ export default function App() {
                 searchTerm={searchTerm}
                 selectedDate={selectedDate}
                 selectedStatus={selectedStatus}
-                currentPage={currentPage}
+                currentPage={displayedPage}
                 totalPages={totalPages}
                 totalFilteredAppointments={filteredAppointments.length}
-                onSearchChange={setSearchTerm}
-                onDateChange={setSelectedDate}
-                onStatusFilterChange={setSelectedStatus}
+                onSearchChange={updateSearchTerm}
+                onDateChange={updateSelectedDate}
+                onStatusFilterChange={updateSelectedStatus}
                 onPageChange={setCurrentPage}
               />
             </div>
@@ -431,9 +535,7 @@ export default function App() {
         services={services}
         existingAppointments={appointments}
         appointmentToEdit={appointmentToEdit}
-        onAppointmentOptimisticUpdate={handleAppointmentOptimisticUpdate}
-        onAppointmentPersistenceSuccess={handleAppointmentPersistenceSuccess}
-        onAppointmentPersistenceError={handleAppointmentPersistenceError}
+        onSaveAppointment={handleSaveAppointment}
       />
 
       <Dialog
