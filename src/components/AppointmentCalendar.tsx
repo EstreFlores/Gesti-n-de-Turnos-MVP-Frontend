@@ -1,4 +1,6 @@
 import { useState, useMemo } from "react";
+import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek, subMonths } from "date-fns";
+import { es } from "date-fns/locale";
 import type { Appointment, Service } from "@/types/appointment";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
@@ -19,6 +21,9 @@ const PROFESSIONALS = [
 
 const HOURS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
 
+const toDateKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+
 const getMonday = (date: Date): Date => {
   const d = new Date(date);
   const day = d.getDay();
@@ -32,7 +37,7 @@ const getWeekDays = (startDate: Date): string[] => {
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
     d.setDate(d.getDate() + i);
-    days.push(d.toISOString().split("T")[0]);
+    days.push(toDateKey(d));
   }
   return days;
 };
@@ -44,7 +49,7 @@ export function AppointmentCalendar({
   onSelectAppointment,
 }: AppointmentCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split("T")[0]
+    toDateKey(new Date())
   );
   
   const [calendarViewMode, setCalendarViewMode] = useState<"day" | "week" | "month">("day");
@@ -52,7 +57,27 @@ export function AppointmentCalendar({
 
   const weekDays = useMemo(() => {
     return getWeekDays(new Date(selectedDate + "T00:00:00"));
-  }, [selectedDate, calendarViewMode]);
+  }, [selectedDate]);
+
+  const monthDays = useMemo(() => {
+    const date = new Date(`${selectedDate}T00:00:00`);
+    return eachDayOfInterval({
+      start: startOfWeek(startOfMonth(date), { weekStartsOn: 1 }),
+      end: endOfWeek(endOfMonth(date), { weekStartsOn: 1 }),
+    });
+  }, [selectedDate]);
+
+  const calendarAppointments = useMemo(() => {
+    const visibleDates = calendarViewMode === "month"
+      ? new Set(monthDays.map(toDateKey))
+      : new Set(weekDays);
+
+    return appointments.filter((appointment) => {
+      const matchesVisibleRange = visibleDates.has(appointment.date);
+      const matchesStatus = statusFilter === "all" || appointment.status === statusFilter;
+      return matchesVisibleRange && matchesStatus;
+    });
+  }, [appointments, calendarViewMode, monthDays, statusFilter, weekDays]);
 
   const dayAppointments = useMemo(() => {
     return appointments.filter((apt) => {
@@ -71,14 +96,17 @@ export function AppointmentCalendar({
   }, [appointments, weekDays, statusFilter]);
 
   const statusCounts = useMemo(() => {
-    const currentDayApts = appointments.filter((apt) => apt.date === selectedDate);
+    const countAppointments = calendarViewMode === "day"
+      ? appointments.filter((apt) => apt.date === selectedDate)
+      : calendarViewMode === "week"
+        ? appointments.filter((apt) => weekDays.includes(apt.date))
+        : appointments.filter((apt) => monthDays.some((day) => toDateKey(day) === apt.date));
     return {
-      pending: currentDayApts.filter(a => a.status === "pending").length,
-      confirmed: currentDayApts.filter(a => a.status === "confirmed").length,
-      completed: currentDayApts.filter(a => a.status === "completed").length,
-      cancelled: currentDayApts.filter(a => a.status === "cancelled").length,
+      pending: countAppointments.filter(a => a.status === "pending").length,
+      confirmed: countAppointments.filter(a => a.status === "confirmed").length,
+      completed: countAppointments.filter(a => a.status === "completed").length,
     };
-  }, [appointments, selectedDate]);
+  }, [appointments, calendarViewMode, monthDays, selectedDate, weekDays]);
 
   const formattedDateTitle = useMemo(() => {
     const dateObj = new Date(selectedDate + "T00:00:00");
@@ -96,6 +124,11 @@ export function AppointmentCalendar({
     return `${start.getDate()} - ${end.getDate()} de ${new Intl.DateTimeFormat("es-ES", { month: "long", year: "numeric" }).format(end)}`;
   }, [weekDays]);
 
+  const formattedMonthTitle = useMemo(
+    () => format(new Date(`${selectedDate}T00:00:00`), "MMMM yyyy", { locale: es }),
+    [selectedDate]
+  );
+
   const getServiceName = (serviceId: string) => {
     const s = services.find((serv) => serv.id === serviceId);
     return s ? s.name : "Servicio";
@@ -104,29 +137,57 @@ export function AppointmentCalendar({
   const handlePrevDay = () => {
     const d = new Date(selectedDate + "T00:00:00");
     d.setDate(d.getDate() - 1);
-    setSelectedDate(d.toISOString().split("T")[0]);
+    setSelectedDate(toDateKey(d));
   };
 
   const handleNextDay = () => {
     const d = new Date(selectedDate + "T00:00:00");
     d.setDate(d.getDate() + 1);
-    setSelectedDate(d.toISOString().split("T")[0]);
+    setSelectedDate(toDateKey(d));
   };
 
   const handlePrevWeek = () => {
     const d = new Date(selectedDate + "T00:00:00");
     d.setDate(d.getDate() - 7);
-    setSelectedDate(d.toISOString().split("T")[0]);
+    setSelectedDate(toDateKey(d));
   };
 
   const handleNextWeek = () => {
     const d = new Date(selectedDate + "T00:00:00");
     d.setDate(d.getDate() + 7);
-    setSelectedDate(d.toISOString().split("T")[0]);
+    setSelectedDate(toDateKey(d));
+  };
+
+  const handlePrevMonth = () => {
+    setSelectedDate(toDateKey(subMonths(new Date(`${selectedDate}T00:00:00`), 1)));
+  };
+
+  const handleNextMonth = () => {
+    setSelectedDate(toDateKey(addMonths(new Date(`${selectedDate}T00:00:00`), 1)));
   };
 
   const handleToday = () => {
-    setSelectedDate(new Date().toISOString().split("T")[0]);
+    setSelectedDate(toDateKey(new Date()));
+  };
+
+  const handlePreviousPeriod = () => {
+    if (calendarViewMode === "month") {
+      handlePrevMonth();
+    } else if (calendarViewMode === "week") {
+      handlePrevWeek();
+    } else {
+      handlePrevDay();
+    }
+  };
+
+  const handleNextPeriod = () => {
+    if (calendarViewMode === "month") {
+      handleNextMonth();
+    } else if (calendarViewMode === "week") {
+      handleNextWeek();
+    } else {
+      handleNextDay();
+    }
   };
 
   return (
@@ -174,9 +235,9 @@ export function AppointmentCalendar({
 
             <div className="flex items-center gap-1.5">
               <button 
-                onClick={calendarViewMode === "week" ? handlePrevWeek : handlePrevDay}
+                onClick={handlePreviousPeriod}
                 className="p-2 hover:bg-slate-100 rounded-xl text-slate-600 transition border border-slate-200 shadow-sm"
-                title={calendarViewMode === "week" ? "Semana anterior" : "Día anterior"}
+                title={calendarViewMode === "month" ? "Mes anterior" : calendarViewMode === "week" ? "Semana anterior" : "Día anterior"}
               >
                 <ChevronLeft size={16} />
               </button>
@@ -189,9 +250,9 @@ export function AppointmentCalendar({
               </button>
 
               <button 
-                onClick={calendarViewMode === "week" ? handleNextWeek : handleNextDay}
+                onClick={handleNextPeriod}
                 className="p-2 hover:bg-slate-100 rounded-xl text-slate-600 transition border border-slate-200 shadow-sm"
-                title={calendarViewMode === "week" ? "Semana siguiente" : "Día siguiente"}
+                title={calendarViewMode === "month" ? "Mes siguiente" : calendarViewMode === "week" ? "Semana siguiente" : "Día siguiente"}
               >
                 <ChevronRight size={16} />
               </button>
@@ -254,7 +315,11 @@ export function AppointmentCalendar({
 
         <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
           <h3 className="text-base font-extrabold text-slate-900 capitalize">
-            {calendarViewMode === "week" ? formattedWeekTitle : formattedDateTitle}
+            {calendarViewMode === "month"
+              ? formattedMonthTitle
+              : calendarViewMode === "week"
+                ? formattedWeekTitle
+                : formattedDateTitle}
           </h3>
           {statusFilter !== "all" && (
             <span className="text-xs text-primary font-medium bg-rose-50 px-3 py-1 rounded-lg border border-rose-100 flex items-center gap-2">
@@ -351,7 +416,7 @@ export function AppointmentCalendar({
               const dayDate = new Date(day + "T00:00:00");
               const dayName = new Intl.DateTimeFormat("es-ES", { weekday: "short" }).format(dayDate);
               const dayNum = dayDate.getDate();
-              const isToday = day === new Date().toISOString().split("T")[0];
+              const isToday = day === toDateKey(new Date());
               
               return (
                 <div 
@@ -417,6 +482,86 @@ export function AppointmentCalendar({
             ))}
           </div>
 
+        </div>
+      )}
+
+      {calendarViewMode === "month" && (
+        <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
+          <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50/70">
+            {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((weekday) => (
+              <div
+                key={weekday}
+                className="p-2 text-center text-xs font-bold uppercase text-slate-500 sm:p-3"
+              >
+                {weekday}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7">
+            {monthDays.map((day) => {
+              const dayKey = toDateKey(day);
+              const dayAppointmentsForCell = calendarAppointments
+                .filter((appointment) => appointment.date === dayKey)
+                .sort((first, second) => first.startTime.localeCompare(second.startTime));
+              const isCurrentMonth = day.getMonth() === new Date(`${selectedDate}T00:00:00`).getMonth();
+              const isToday = dayKey === toDateKey(new Date());
+
+              return (
+                <div
+                  key={dayKey}
+                  className={`min-h-28 border-b border-r border-slate-100 p-1.5 sm:min-h-36 sm:p-2 ${
+                    isCurrentMonth ? "bg-white" : "bg-slate-50/70"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDate(dayKey);
+                      setCalendarViewMode("day");
+                    }}
+                    aria-label={`Ver citas del ${format(day, "d 'de' MMMM", { locale: es })}`}
+                    className={`mb-1 flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold ${
+                      isToday
+                        ? "bg-primary text-white"
+                        : isCurrentMonth
+                          ? "text-slate-700 hover:bg-slate-100"
+                          : "text-slate-400 hover:bg-slate-200"
+                    }`}
+                  >
+                    {day.getDate()}
+                  </button>
+
+                  <div className="space-y-1">
+                    {dayAppointmentsForCell.slice(0, 3).map((appointment) => (
+                      <button
+                        type="button"
+                        key={appointment.id}
+                        onClick={() => onSelectAppointment(appointment)}
+                        title={`${appointment.startTime} · ${appointment.clientName} · ${getServiceName(appointment.serviceId)}`}
+                        className="block w-full truncate rounded-md border border-rose-200 bg-rose-50 px-1.5 py-1 text-left text-[10px] leading-tight text-rose-900 transition hover:border-primary/50 sm:text-xs"
+                      >
+                        <span className="font-semibold">{appointment.startTime}</span>{" "}
+                        <span>{appointment.clientName}</span>
+                      </button>
+                    ))}
+                    {dayAppointmentsForCell.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDate(dayKey);
+                          setCalendarViewMode("day");
+                        }}
+                        className="px-1 text-[10px] font-semibold text-primary hover:underline"
+                      >
+                        +{dayAppointmentsForCell.length - 3} más
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
