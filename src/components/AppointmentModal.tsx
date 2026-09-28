@@ -112,6 +112,7 @@ export function AppointmentModal({
       if (apt.id === appointmentToEdit?.id) return false;
       if (apt.date !== watchedDate) return false;
       if (apt.status === "cancelled") return false;
+      if ((apt.professionalId || PROFESSIONALS[0].id) !== professionalId) return false;
       
       const [aptH, aptM] = apt.startTime.split(":").map(Number);
       const aptStartTotal = aptH * 60 + aptM;
@@ -119,7 +120,7 @@ export function AppointmentModal({
 
       return newStartTotal < aptEndTotal && newEndTotal > aptStartTotal;
     });
-  }, [watchedDate, watchedStartTime, durationMinutes, existingAppointments, services, appointmentToEdit]);
+  }, [watchedDate, watchedStartTime, durationMinutes, existingAppointments, appointmentToEdit, professionalId]);
 
   if (!isOpen) return null;
 
