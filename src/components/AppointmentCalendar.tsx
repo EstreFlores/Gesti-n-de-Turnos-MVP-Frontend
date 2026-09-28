@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { addMonths, eachDayOfInterval, endOfMonth, endOfWeek, format, startOfMonth, startOfWeek, subMonths } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Appointment, Service } from "@/types/appointment";
+import { PROFESSIONALS } from "@/features/appointments/data/professionals";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
 
@@ -12,14 +13,13 @@ interface AppointmentCalendarProps {
   onSelectAppointment: (appointment: Appointment) => void;
 }
 
-const PROFESSIONALS = [
-  "Dra. Camila Santos",
-  "Lic. Mariana Gaviria",
-  "Valeria Martínez",
-  "Sofía Gómez"
-];
-
 const HOURS = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00"];
+
+const getTimeSlots = (appointments: Appointment[]) =>
+  [...new Set([...HOURS, ...appointments.map((appointment) => appointment.startTime)])].sort();
+
+const getProfessionalId = (appointment: Appointment) =>
+  appointment.professionalId || PROFESSIONALS[0].id;
 
 const toDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -94,6 +94,9 @@ export function AppointmentCalendar({
       return matchesWeek && matchesStatus;
     });
   }, [appointments, weekDays, statusFilter]);
+
+  const dayTimeSlots = useMemo(() => getTimeSlots(dayAppointments), [dayAppointments]);
+  const weekTimeSlots = useMemo(() => getTimeSlots(weekAppointments), [weekAppointments]);
 
   const statusCounts = useMemo(() => {
     const countAppointments = calendarViewMode === "day"
@@ -343,48 +346,55 @@ export function AppointmentCalendar({
             <div className="p-3 text-xs font-bold text-slate-400 uppercase border-r border-slate-100 flex items-center justify-center gap-1">
               <Clock size={14} /> Hora
             </div>
-            {PROFESSIONALS.map((prof, idx) => (
-              <div key={idx} className="p-3 border-r border-slate-100 last:border-r-0">
-                <div className="font-bold text-slate-800 text-xs truncate">{prof}</div>
-                <div className="text-[10px] text-slate-400">Cabina Glow</div>
+            {PROFESSIONALS.map((professional) => (
+              <div key={professional.id} className="p-3 border-r border-slate-100 last:border-r-0">
+                <div className="font-bold text-slate-800 text-xs truncate">{professional.name}</div>
+                <div className="text-[10px] text-slate-400 truncate">{professional.specialty}</div>
               </div>
             ))}
           </div>
 
           <div className="divide-y divide-slate-100">
-            {HOURS.map((hour) => (
+            {dayTimeSlots.map((hour) => (
               <div key={hour} className="grid grid-cols-5 min-h-[70px]">
                 
                 <div className="p-3 text-xs font-semibold text-slate-400 border-r border-slate-100 bg-slate-50/30 flex items-start justify-center">
                   {hour}
                 </div>
 
-                {PROFESSIONALS.map((_, profIdx) => {
-                  const matchedApt = dayAppointments.find(
-                    (apt) => apt.startTime.startsWith(hour.substring(0, 2))
+                {PROFESSIONALS.map((professional) => {
+                  const matchedAppointments = dayAppointments.filter(
+                    (appointment) =>
+                      appointment.startTime === hour &&
+                      getProfessionalId(appointment) === professional.id
                   );
 
                   return (
-                    <div key={profIdx} className="p-2 border-r border-slate-100 last:border-r-0 relative group">
-                      {matchedApt ? (
-                        <div 
-                          onClick={() => onSelectAppointment(matchedApt)}
-                          className="bg-rose-50/90 border border-rose-200 hover:border-primary/50 rounded-xl p-2.5 cursor-pointer shadow-sm transition hover:shadow-md"
-                        >
-                          <div className="flex justify-between items-start">
-                            <span className="font-bold text-xs text-slate-900 truncate">
-                              {matchedApt.clientName}
-                            </span>
-                            <span className="text-[9px] bg-primary text-white px-1.5 py-0.5 rounded-full font-medium uppercase">
-                              {matchedApt.status}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-primary font-medium mt-0.5 truncate">
-                            {getServiceName(matchedApt.serviceId)}
-                          </p>
-                          <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1">
-                            <Clock size={10} /> {matchedApt.startTime} ({matchedApt.durationMinutes}m)
-                          </div>
+                    <div key={professional.id} className="p-2 border-r border-slate-100 last:border-r-0 relative group">
+                      {matchedAppointments.length > 0 ? (
+                        <div className="space-y-2">
+                          {matchedAppointments.map((appointment) => (
+                            <div
+                              key={appointment.id}
+                              onClick={() => onSelectAppointment(appointment)}
+                              className="bg-rose-50/90 border border-rose-200 hover:border-primary/50 rounded-xl p-2.5 cursor-pointer shadow-sm transition hover:shadow-md"
+                            >
+                              <div className="flex justify-between items-start">
+                                <span className="font-bold text-xs text-slate-900 truncate">
+                                  {appointment.clientName}
+                                </span>
+                                <span className="text-[9px] bg-primary text-white px-1.5 py-0.5 rounded-full font-medium uppercase">
+                                  {appointment.status}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-primary font-medium mt-0.5 truncate">
+                                {getServiceName(appointment.serviceId)}
+                              </p>
+                              <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-1">
+                                <Clock size={10} /> {appointment.startTime} ({appointment.durationMinutes}m)
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <div className="h-full w-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
@@ -431,7 +441,7 @@ export function AppointmentCalendar({
               );
             })}
 
-            {HOURS.map((hour) => (
+            {weekTimeSlots.map((hour) => (
               <div key={hour} className="contents">
                 
                 <div className="p-3 text-xs font-semibold text-slate-400 border-b border-slate-100 bg-slate-50/30 flex items-center justify-center min-h-[90px] sticky left-0 z-10">
@@ -439,8 +449,8 @@ export function AppointmentCalendar({
                 </div>
 
                 {weekDays.map((day) => {
-                  const aptForSlot = weekAppointments.find(
-                    (apt) => apt.date === day && apt.startTime.startsWith(hour.substring(0, 2))
+                  const appointmentsForSlot = weekAppointments.filter(
+                    (appointment) => appointment.date === day && appointment.startTime === hour
                   );
 
                   return (
@@ -448,25 +458,30 @@ export function AppointmentCalendar({
                       key={`${day}-${hour}`} 
                       className="p-2 border-b border-slate-100 relative group min-h-[90px] flex items-center"
                     >
-                      {aptForSlot ? (
-                        <div 
-                          onClick={() => onSelectAppointment(aptForSlot)}
-                          className="w-full bg-rose-50/90 border border-rose-200 hover:border-primary/50 rounded-xl p-2 cursor-pointer shadow-sm transition hover:shadow-md"
-                        >
-                          <div className="flex justify-between items-start gap-1">
-                            <span className="font-bold text-xs text-slate-900 truncate flex-1">
-                              {aptForSlot.clientName}
-                            </span>
-                            <span className="text-[8px] bg-primary text-white px-1 py-0.5 rounded-full font-medium uppercase whitespace-nowrap">
-                              {aptForSlot.status}
-                            </span>
-                          </div>
-                          <p className="text-[10px] text-primary font-medium mt-0.5 truncate">
-                            {getServiceName(aptForSlot.serviceId)}
-                          </p>
-                          <div className="flex items-center gap-1 text-[9px] text-slate-400 mt-0.5">
-                            <Clock size={9} /> {aptForSlot.startTime}
-                          </div>
+                      {appointmentsForSlot.length > 0 ? (
+                        <div className="w-full space-y-2">
+                          {appointmentsForSlot.map((appointment) => (
+                            <div
+                              key={appointment.id}
+                              onClick={() => onSelectAppointment(appointment)}
+                              className="w-full bg-rose-50/90 border border-rose-200 hover:border-primary/50 rounded-xl p-2 cursor-pointer shadow-sm transition hover:shadow-md"
+                            >
+                              <div className="flex justify-between items-start gap-1">
+                                <span className="font-bold text-xs text-slate-900 truncate flex-1">
+                                  {appointment.clientName}
+                                </span>
+                                <span className="text-[8px] bg-primary text-white px-1 py-0.5 rounded-full font-medium uppercase whitespace-nowrap">
+                                  {appointment.status}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-primary font-medium mt-0.5 truncate">
+                                {getServiceName(appointment.serviceId)}
+                              </p>
+                              <div className="flex items-center gap-1 text-[9px] text-slate-400 mt-0.5">
+                                <Clock size={9} /> {appointment.startTime}
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : (
                         <div className="w-full h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition">

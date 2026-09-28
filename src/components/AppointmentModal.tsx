@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Appointment, Service } from "@/types/appointment";
+import { PROFESSIONALS } from "@/features/appointments/data/professionals";
 import { appointmentFormSchema, type AppointmentFormValues } from "@/features/appointments/schemas/appointmentSchema";
 import { toast } from "@/components/ui/toast";
 import { X, Calendar, Clock, User, Phone, Scissors, AlertCircle, CheckCircle2 } from "lucide-react";
@@ -18,13 +19,6 @@ interface AppointmentModalProps {
   ) => void;
 }
 
-const PROFESSIONALS = [
-  "Dra. Camila Santos (Dermatocosmiatría)",
-  "Lic. Mariana Gaviria (Estética Capilar)",
-  "Valeria Martínez (Master Stylist)",
-  "Sofía Gómez (Especialista en Uñas)"
-];
-
 export function AppointmentModal({ 
   isOpen, 
   onClose, 
@@ -33,7 +27,7 @@ export function AppointmentModal({
   appointmentToEdit,
   onSaveAppointment,
 }: AppointmentModalProps) {
-  const [professional, setProfessional] = useState(PROFESSIONALS[0]);
+  const [professionalId, setProfessionalId] = useState(PROFESSIONALS[0].id);
 
   
   const {register, handleSubmit, watch, setValue, reset,
@@ -56,8 +50,7 @@ export function AppointmentModal({
     if (!isOpen) return;
 
     if (appointmentToEdit) {
-      const professionalMatch = appointmentToEdit.notes?.match(/\[Profesional: (.+?)\]/);
-      setProfessional(professionalMatch?.[1] || PROFESSIONALS[0]);
+      setProfessionalId(appointmentToEdit.professionalId || PROFESSIONALS[0].id);
       reset({
         clientName: appointmentToEdit.clientName,
         clientPhone: appointmentToEdit.clientPhone || "",
@@ -65,11 +58,11 @@ export function AppointmentModal({
         date: appointmentToEdit.date,
         startTime: appointmentToEdit.startTime,
         durationMinutes: appointmentToEdit.durationMinutes,
-        notes: appointmentToEdit.notes?.replace(/\s*\[Profesional: .+?\]\s*$/, "").trim() || "",
+        notes: appointmentToEdit.notes || "",
         status: appointmentToEdit.status,
       });
     } else {
-      setProfessional(PROFESSIONALS[0]);
+      setProfessionalId(PROFESSIONALS[0].id);
       reset({
         status: "pending",
         durationMinutes: services[0]?.durationMinutes || 45,
@@ -141,7 +134,6 @@ export function AppointmentModal({
     }
 
     const optimisticId = appointmentToEdit?.id ?? `optimistic-${crypto.randomUUID()}`;
-    const notes = `${data.notes || ""} [Profesional: ${professional}]`.trim();
     const optimisticAppointment: Appointment = {
       ...(appointmentToEdit ?? {
         id: optimisticId,
@@ -149,7 +141,8 @@ export function AppointmentModal({
       }),
       ...data,
       durationMinutes,
-      notes,
+      professionalId,
+      notes: data.notes?.trim() || "",
       id: optimisticId,
       updatedAt: new Date().toISOString(),
     };
@@ -251,12 +244,14 @@ export function AppointmentModal({
                   <User size={15} />
                 </span>
                 <select 
-                  value={professional}
-                  onChange={(e) => setProfessional(e.target.value)}
+                  value={professionalId}
+                  onChange={(e) => setProfessionalId(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none truncate"
                 >
-                  {PROFESSIONALS.map((prof, idx) => (
-                    <option key={idx} value={prof}>{prof}</option>
+                  {PROFESSIONALS.map((professional) => (
+                    <option key={professional.id} value={professional.id}>
+                      {professional.name} ({professional.specialty})
+                    </option>
                   ))}
                 </select>
               </div>

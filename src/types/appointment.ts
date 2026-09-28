@@ -7,11 +7,18 @@ export interface Service {
   price: number;
 }
 
+export interface Professional {
+  id: string;
+  name: string;
+  specialty: string;
+}
+
 export interface Appointment {
   id: string;
   clientName: string;
   clientPhone?: string;
   serviceId: string;
+  professionalId: string;
   date: string; // Formato: YYYY-MM-DD
   startTime: string; // Formato: HH:mm
   durationMinutes: number;
