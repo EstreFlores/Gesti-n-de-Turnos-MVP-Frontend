@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Trash2, Edit, Clock, Phone } from "lucide-react";
 
-interface AppointmentTableProps {
+export interface AppointmentTableProps {
   appointments: Appointment[];
   services: Service[];
   onStatusChange: (id: string, newStatus: Appointment["status"]) => void;

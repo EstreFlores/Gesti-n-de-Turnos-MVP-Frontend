@@ -59,3 +59,4 @@ export const appointmentFormSchema = z.object({
 });
 
 export type AppointmentFormValues = z.infer<typeof appointmentFormSchema>;
+export type AppointmentFormInput = z.input<typeof appointmentFormSchema>;
