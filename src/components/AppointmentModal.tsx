@@ -2,9 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { Appointment, Service } from "@/types/appointment";
+import { PROFESSIONALS } from "@/features/appointments/data/professionals";
 import { appointmentFormSchema, type AppointmentFormValues } from "@/features/appointments/schemas/appointmentSchema";
 import { toast } from "@/components/ui/toast";
-import { X, Calendar, Clock, User, Phone, Scissors, AlertCircle, CheckCircle2 } from "lucide-react";
+import { X, Calendar } from "lucide-react";
+import { AppointmentClientFields } from "@/components/AppointmentClientFields";
+import { AppointmentScheduleFields } from "@/components/AppointmentScheduleFields";
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -18,13 +21,6 @@ interface AppointmentModalProps {
   ) => void;
 }
 
-const PROFESSIONALS = [
-  "Dra. Camila Santos (Dermatocosmiatría)",
-  "Lic. Mariana Gaviria (Estética Capilar)",
-  "Valeria Martínez (Master Stylist)",
-  "Sofía Gómez (Especialista en Uñas)"
-];
-
 export function AppointmentModal({ 
   isOpen, 
   onClose, 
@@ -33,7 +29,7 @@ export function AppointmentModal({
   appointmentToEdit,
   onSaveAppointment,
 }: AppointmentModalProps) {
-  const [professional, setProfessional] = useState(PROFESSIONALS[0]);
+  const [professionalId, setProfessionalId] = useState(PROFESSIONALS[0].id);
 
   
   const {register, handleSubmit, watch, setValue, reset,
@@ -56,8 +52,7 @@ export function AppointmentModal({
     if (!isOpen) return;
 
     if (appointmentToEdit) {
-      const professionalMatch = appointmentToEdit.notes?.match(/\[Profesional: (.+?)\]/);
-      setProfessional(professionalMatch?.[1] || PROFESSIONALS[0]);
+      setProfessionalId(appointmentToEdit.professionalId || PROFESSIONALS[0].id);
       reset({
         clientName: appointmentToEdit.clientName,
         clientPhone: appointmentToEdit.clientPhone || "",
@@ -65,11 +60,11 @@ export function AppointmentModal({
         date: appointmentToEdit.date,
         startTime: appointmentToEdit.startTime,
         durationMinutes: appointmentToEdit.durationMinutes,
-        notes: appointmentToEdit.notes?.replace(/\s*\[Profesional: .+?\]\s*$/, "").trim() || "",
+        notes: appointmentToEdit.notes || "",
         status: appointmentToEdit.status,
       });
     } else {
-      setProfessional(PROFESSIONALS[0]);
+      setProfessionalId(PROFESSIONALS[0].id);
       reset({
         status: "pending",
         durationMinutes: services[0]?.durationMinutes || 45,
@@ -119,6 +114,7 @@ export function AppointmentModal({
       if (apt.id === appointmentToEdit?.id) return false;
       if (apt.date !== watchedDate) return false;
       if (apt.status === "cancelled") return false;
+      if ((apt.professionalId || PROFESSIONALS[0].id) !== professionalId) return false;
       
       const [aptH, aptM] = apt.startTime.split(":").map(Number);
       const aptStartTotal = aptH * 60 + aptM;
@@ -126,7 +122,7 @@ export function AppointmentModal({
 
       return newStartTotal < aptEndTotal && newEndTotal > aptStartTotal;
     });
-  }, [watchedDate, watchedStartTime, durationMinutes, existingAppointments, services, appointmentToEdit]);
+  }, [watchedDate, watchedStartTime, durationMinutes, existingAppointments, appointmentToEdit, professionalId]);
 
   if (!isOpen) return null;
 
@@ -141,7 +137,6 @@ export function AppointmentModal({
     }
 
     const optimisticId = appointmentToEdit?.id ?? `optimistic-${crypto.randomUUID()}`;
-    const notes = `${data.notes || ""} [Profesional: ${professional}]`.trim();
     const optimisticAppointment: Appointment = {
       ...(appointmentToEdit ?? {
         id: optimisticId,
@@ -149,7 +144,8 @@ export function AppointmentModal({
       }),
       ...data,
       durationMinutes,
-      notes,
+      professionalId,
+      notes: data.notes?.trim() || "",
       id: optimisticId,
       updatedAt: new Date().toISOString(),
     };
@@ -189,163 +185,23 @@ export function AppointmentModal({
 
         <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Nombre del Cliente *</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <User size={15} />
-                </span>
-                <input 
-                  type="text" 
-                  {...register("clientName")}
-                  placeholder="Ej. María Fernanda Gómez"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                />
-              </div>
-              {errors.clientName && <span className="text-[11px] text-rose-500 font-medium mt-1 block">{String(errors.clientName.message)}</span>}
-            </div>
+          <AppointmentClientFields
+            register={register}
+            errors={errors}
+            services={services}
+            professionalId={professionalId}
+            onProfessionalChange={setProfessionalId}
+          />
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">WhatsApp / Teléfono *</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <Phone size={15} />
-                </span>
-                <input 
-                  type="text" 
-                  {...register("clientPhone")}
-                  placeholder="+52 312 456 7890"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                />
-              </div>
-              {errors.clientPhone && <span className="text-[11px] text-rose-500 font-medium mt-1 block">{String(errors.clientPhone.message)}</span>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Tratamiento o Servicio *</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <Scissors size={15} />
-                </span>
-                <select 
-                  {...register("serviceId")}
-                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none truncate"
-                >
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name} (${service.price} - {service.durationMinutes} min)
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {errors.serviceId && <span className="text-[11px] text-rose-500 font-medium mt-1 block">{String(errors.serviceId.message)}</span>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Profesional Asignado *</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <User size={15} />
-                </span>
-                <select 
-                  value={professional}
-                  onChange={(e) => setProfessional(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition appearance-none truncate"
-                >
-                  {PROFESSIONALS.map((prof, idx) => (
-                    <option key={idx} value={prof}>{prof}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
-              Estado de la cita *
-            </label>
-            <select
-              {...register("status")}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-            >
-              <option value="pending">Pendiente</option>
-              <option value="confirmed">Confirmada</option>
-              <option value="completed">Completada</option>
-              <option value="cancelled">Cancelada</option>
-            </select>
-            {errors.status && (
-              <span className="text-[11px] text-rose-500 font-medium mt-1 block">
-                {String(errors.status.message)}
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Fecha de Cita *</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <Calendar size={15} />
-                </span>
-                <input 
-                  type="date" 
-                  {...register("date")}
-                  className="w-full pl-9 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                />
-              </div>
-              {errors.date && <span className="text-[11px] text-rose-500 font-medium mt-1 block">{String(errors.date.message)}</span>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Hora Inicio *</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
-                  <Clock size={15} />
-                </span>
-                <input 
-                  type="time" 
-                  {...register("startTime")}
-                  className="w-full pl-9 pr-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-                />
-              </div>
-              {errors.startTime && <span className="text-[11px] text-rose-500 font-medium mt-1 block">{String(errors.startTime.message)}</span>}
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">Duración Estimada</label>
-              <div className="flex items-center justify-between px-3 py-2 bg-rose-50/70 border border-rose-100 rounded-xl text-xs text-slate-700 font-medium">
-                <span className="flex items-center gap-1 text-primary">
-                  <Clock size={14} /> {durationMinutes} min
-                </span>
-                <span className="text-slate-400">Fin: {endTime}</span>
-              </div>
-            </div>
-          </div>
-
-          {watchedDate && watchedStartTime && (
-            <div>
-              {overlapConflict ? (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2.5 text-xs text-rose-800">
-                  <AlertCircle size={16} className="text-rose-600 mt-0.5 shrink-0" />
-                  <div>
-                    <span className="font-bold block">¡Conflicto de horario detectado!</span>
-                    Ya existe una cita programada con <span className="font-semibold">{overlapConflict.clientName}</span> a las {overlapConflict.startTime}.
-                  </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl flex items-start gap-2.5 text-xs text-emerald-900">
-                  <CheckCircle2 size={16} className="text-emerald-600 mt-0.5 shrink-0" />
-                  <div>
-                    <span className="font-bold block">Horario disponible sin solapamientos</span>
-                    El especialista y la cabina se encuentran libres de {watchedStartTime} a {endTime}.
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <AppointmentScheduleFields
+            register={register}
+            errors={errors}
+            durationMinutes={durationMinutes}
+            endTime={endTime}
+            watchedDate={watchedDate}
+            watchedStartTime={watchedStartTime}
+            overlapConflict={overlapConflict}
+          />
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 uppercase mb-1">
