@@ -1,5 +1,6 @@
 import { Users, Clock, CheckCircle2, DollarSign } from "lucide-react";
 import type { Appointment, Service } from "@/types/appointment";
+import { getServiceById } from "@/features/appointments/utils/serviceUtils";
 
 interface StatsCardsProps {
   appointments: Appointment[];
@@ -18,7 +19,7 @@ export function StatsCards({ appointments, services }: StatsCardsProps) {
     (appointment) => appointment.date === today && appointment.status === "completed"
   );
   const estimatedRevenue = todaysAppointments.reduce((total, appointment) => {
-    const service = services.find((item) => item.id === appointment.serviceId);
+    const service = getServiceById(services, appointment.serviceId);
     return total + (service?.price ?? 0);
   }, 0);
 
