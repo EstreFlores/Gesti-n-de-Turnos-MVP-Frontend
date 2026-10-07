@@ -1,5 +1,6 @@
 import { Clock } from "lucide-react";
-import { toDateKey } from "@/components/calendar/calendarUtils";
+import { toDateKey } from "@/features/appointments/components/AppointmentCalendar/calendarUtils";
+import { getServiceName } from "@/features/appointments/utils/serviceUtils";
 import type { Appointment, Service } from "@/types/appointment";
 
 interface CalendarWeekViewProps {
@@ -17,9 +18,6 @@ export function CalendarWeekView({
   timeSlots,
   onSelectAppointment,
 }: CalendarWeekViewProps) {
-  const getServiceName = (serviceId: string) =>
-    services.find((service) => service.id === serviceId)?.name ?? "Servicio";
-
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-100 bg-white shadow-sm">
       <div className="grid gap-px" style={{ gridTemplateColumns: "60px repeat(7, 1fr)" }}>
@@ -72,7 +70,7 @@ export function CalendarWeekView({
                             <span className="flex-1 truncate text-xs font-bold text-slate-900">{appointment.clientName}</span>
                             <span className="whitespace-nowrap rounded-full bg-primary px-1 py-0.5 text-[8px] font-medium uppercase text-white">{appointment.status}</span>
                           </div>
-                          <p className="mt-0.5 truncate text-[10px] font-medium text-primary">{getServiceName(appointment.serviceId)}</p>
+                          <p className="mt-0.5 truncate text-[10px] font-medium text-primary">{getServiceName(services, appointment.serviceId)}</p>
                           <div className="mt-0.5 flex items-center gap-1 text-[9px] text-slate-400">
                             <Clock size={9} /> {appointment.startTime}
                           </div>

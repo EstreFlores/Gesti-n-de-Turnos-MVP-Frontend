@@ -1,5 +1,6 @@
 import React from "react";
-import type { Appointment, Service } from "../types/appointment";
+import type { Appointment, Service } from "@/types/appointment";
+import { getServiceName } from "@/features/appointments/utils/serviceUtils";
 import { 
   Table, 
   TableBody, 
@@ -47,11 +48,6 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
   onStatusFilterChange,
   onPageChange,
 }) => {
-  const getServiceName = (serviceId: string) => {
-    const service = services.find((s) => s.id === serviceId);
-    return service ? service.name : "Servicio general";
-  };
-
   const statusConfig: Record<Appointment["status"], { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
     pending: { label: "Pendiente", variant: "secondary" },
     confirmed: { label: "Confirmada", variant: "default" },
@@ -124,7 +120,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
                           <div className="text-xs text-muted-foreground">{apt.clientPhone}</div>
                         )}
                       </TableCell>
-                      <TableCell>{getServiceName(apt.serviceId)}</TableCell>
+                      <TableCell>{getServiceName(services, apt.serviceId, "Servicio general")}</TableCell>
                       <TableCell>
                         <div className="text-sm font-semibold">{apt.date}</div>
                         <div className="text-xs text-muted-foreground">{apt.startTime} hrs</div>
@@ -172,7 +168,7 @@ export const AppointmentTable: React.FC<AppointmentTableProps> = ({
                   </div>
 
                   <div className="space-y-2 text-sm mb-4">
-                    <div><span className="font-medium">Servicio:</span> {getServiceName(apt.serviceId)}</div>
+                    <div><span className="font-medium">Servicio:</span> {getServiceName(services, apt.serviceId, "Servicio general")}</div>
                     <div className="flex items-center gap-2"><Clock size={14} /> {apt.date} a las {apt.startTime}</div>
                     <div><span className="font-medium">Duración:</span> {apt.durationMinutes} min</div>
                   </div>

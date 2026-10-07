@@ -1,6 +1,6 @@
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { CalendarViewMode } from "@/components/calendar/calendarUtils";
+import type { CalendarViewMode } from "@/features/appointments/components/AppointmentCalendar/calendarUtils";
 
 interface CalendarToolbarProps {
   viewMode: CalendarViewMode;

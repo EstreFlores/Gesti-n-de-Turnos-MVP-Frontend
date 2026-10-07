@@ -19,6 +19,11 @@ export function AppLayout({
   onNewAppointment,
   children,
 }: AppLayoutProps) {
+  const todayLabel = new Intl.DateTimeFormat("es-ES", {
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
+
   return (
     <div className="flex min-h-screen bg-slate-50">
       <Sidebar
@@ -33,7 +38,7 @@ export function AppLayout({
             <div>
               <div className="mb-1 flex items-center gap-2 text-xs font-semibold text-slate-400">
                 <CalendarIcon size={14} />
-                <span>Hoy, 24 de Octubre</span>
+                <span>Hoy, {todayLabel}</span>
               </div>
               <h1 className="text-2xl font-extrabold text-slate-900">
                 ¡Hola, Estre! 👋

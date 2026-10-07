@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { AppLoadingState } from "@/components/AppLoadingState";
 import { CancelAppointmentDialog } from "@/components/CancelAppointmentDialog";
-import { AppointmentModal } from "@/components/AppointmentModal";
+import { AppointmentModal } from "@/features/appointments/components/AppointmentModal";
 import { useAppointments } from "@/features/appointments/hooks/useAppointments";
 import { useAppointmentFilters } from "@/hooks/useAppointmentFilters";
 import { AppointmentsView } from "@/views/AppointmentsView";

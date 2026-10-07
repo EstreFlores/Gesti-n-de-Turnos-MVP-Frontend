@@ -1,6 +1,6 @@
-import { StatsCards } from "@/components/StatsCards";
+import { StatsCards } from "@/features/appointments/components/StatsCards";
 import type { Appointment, Service } from "@/types/appointment";
-import type { AppointmentTableProps } from "@/components/AppointmentTable";
+import type { AppointmentTableProps } from "@/features/appointments/components/AppointmentTable";
 import { AppointmentListSection } from "@/views/AppointmentListSection";
 
 interface DashboardViewProps {

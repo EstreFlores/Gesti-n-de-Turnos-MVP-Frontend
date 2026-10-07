@@ -1,10 +1,12 @@
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Appointment, Service } from "@/types/appointment";
-import { toDateKey } from "@/components/calendar/calendarUtils";
+import { toDateKey } from "@/features/appointments/components/AppointmentCalendar/calendarUtils";
+import { getServiceName } from "@/features/appointments/utils/serviceUtils";
 
 interface CalendarMonthViewProps {
-  appointments: Appointment[];
+  appointmentsByDate: Map<string, Appointment[]>;
+  statusFilter: string;
   services: Service[];
   days: Date[];
   selectedDate: string;
@@ -13,15 +15,14 @@ interface CalendarMonthViewProps {
 }
 
 export function CalendarMonthView({
-  appointments,
+  appointmentsByDate,
+  statusFilter,
   services,
   days,
   selectedDate,
   onSelectDate,
   onSelectAppointment,
 }: CalendarMonthViewProps) {
-  const getServiceName = (serviceId: string) =>
-    services.find((service) => service.id === serviceId)?.name ?? "Servicio";
   const currentMonth = new Date(`${selectedDate}T00:00:00`).getMonth();
 
   return (
@@ -36,8 +37,8 @@ export function CalendarMonthView({
       <div className="grid grid-cols-7">
         {days.map((day) => {
           const dayKey = toDateKey(day);
-          const dayAppointments = appointments
-            .filter((appointment) => appointment.date === dayKey)
+          const dayAppointments = (appointmentsByDate.get(dayKey) ?? [])
+            .filter((appointment) => statusFilter === "all" || appointment.status === statusFilter)
             .sort((first, second) => first.startTime.localeCompare(second.startTime));
           const isCurrentMonth = day.getMonth() === currentMonth;
           const isToday = dayKey === toDateKey(new Date());
@@ -68,7 +69,7 @@ export function CalendarMonthView({
                     type="button"
                     key={appointment.id}
                     onClick={() => onSelectAppointment(appointment)}
-                    title={`${appointment.startTime} · ${appointment.clientName} · ${getServiceName(appointment.serviceId)}`}
+                    title={`${appointment.startTime} · ${appointment.clientName} · ${getServiceName(services, appointment.serviceId)}`}
                     className="block w-full truncate rounded-md border border-rose-200 bg-rose-50 px-1.5 py-1 text-left text-[10px] leading-tight text-rose-900 transition hover:border-primary/50 sm:text-xs"
                   >
                     <span className="font-semibold">{appointment.startTime}</span>{" "}

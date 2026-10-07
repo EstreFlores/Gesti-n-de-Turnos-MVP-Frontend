@@ -4,10 +4,11 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import type { Appointment, Service } from "@/types/appointment";
 import { PROFESSIONALS } from "@/features/appointments/data/professionals";
 import { appointmentFormSchema, type AppointmentFormValues } from "@/features/appointments/schemas/appointmentSchema";
-import { toast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/toastManager";
 import { X, Calendar } from "lucide-react";
-import { AppointmentClientFields } from "@/components/AppointmentClientFields";
-import { AppointmentScheduleFields } from "@/components/AppointmentScheduleFields";
+import { AppointmentClientFields } from "@/features/appointments/components/AppointmentModal/AppointmentClientFields";
+import { AppointmentScheduleFields } from "@/features/appointments/components/AppointmentModal/AppointmentScheduleFields";
+import { getServiceById } from "@/features/appointments/utils/serviceUtils";
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -83,7 +84,7 @@ export function AppointmentModal({
   const watchedStartTime = watch("startTime");
 
   useEffect(() => {
-    const selected = services.find((s) => s.id === watchedServiceId);
+    const selected = getServiceById(services, watchedServiceId);
     if (selected) {
       setValue("durationMinutes", selected.durationMinutes);
     } else if (services.length > 0) {

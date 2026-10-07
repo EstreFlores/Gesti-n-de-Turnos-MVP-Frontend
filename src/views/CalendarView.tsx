@@ -1,4 +1,4 @@
-import { AppointmentCalendar } from "@/components/AppointmentCalendar";
+import { AppointmentCalendar } from "@/features/appointments/components/AppointmentCalendar";
 import type { Appointment, Service } from "@/types/appointment";
 
 interface CalendarViewProps {

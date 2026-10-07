@@ -11,11 +11,11 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import type { Appointment, Service } from "@/types/appointment";
-import { CalendarDayView } from "@/components/calendar/CalendarDayView";
-import { CalendarMonthView } from "@/components/calendar/CalendarMonthView";
-import { CalendarToolbar } from "@/components/calendar/CalendarToolbar";
-import { CalendarWeekView } from "@/components/calendar/CalendarWeekView";
-import { getTimeSlots, getWeekDays, toDateKey, type CalendarViewMode } from "@/components/calendar/calendarUtils";
+import { CalendarDayView } from "@/features/appointments/components/AppointmentCalendar/CalendarDayView";
+import { CalendarMonthView } from "@/features/appointments/components/AppointmentCalendar/CalendarMonthView";
+import { CalendarToolbar } from "@/features/appointments/components/AppointmentCalendar/CalendarToolbar";
+import { CalendarWeekView } from "@/features/appointments/components/AppointmentCalendar/CalendarWeekView";
+import { getTimeSlots, getWeekDays, toDateKey, type CalendarViewMode } from "@/features/appointments/components/AppointmentCalendar/calendarUtils";
 
 interface AppointmentCalendarProps {
   appointments: Appointment[];
@@ -46,40 +46,45 @@ export function AppointmentCalendar({
     });
   }, [selectedDate]);
 
+  const appointmentsByDate = useMemo(() => {
+    const grouped = new Map<string, Appointment[]>();
+    appointments.forEach((appointment) => {
+      const dayAppointments = grouped.get(appointment.date) ?? [];
+      dayAppointments.push(appointment);
+      grouped.set(appointment.date, dayAppointments);
+    });
+    return grouped;
+  }, [appointments]);
+
   const dayAppointments = useMemo(
-    () => appointments.filter((appointment) =>
-      appointment.date === selectedDate &&
-      (statusFilter === "all" || appointment.status === statusFilter)
+    () => (appointmentsByDate.get(selectedDate) ?? []).filter(
+      (appointment) => statusFilter === "all" || appointment.status === statusFilter
     ),
-    [appointments, selectedDate, statusFilter]
+    [appointmentsByDate, selectedDate, statusFilter]
   );
   const weekAppointments = useMemo(
-    () => appointments.filter((appointment) =>
-      weekDays.includes(appointment.date) &&
-      (statusFilter === "all" || appointment.status === statusFilter)
-    ),
-    [appointments, weekDays, statusFilter]
+    () => weekDays.flatMap((day) => appointmentsByDate.get(day) ?? [])
+      .filter((appointment) => statusFilter === "all" || appointment.status === statusFilter),
+    [appointmentsByDate, weekDays, statusFilter]
   );
-  const monthAppointments = useMemo(() => {
-    const visibleDates = new Set(monthDays.map(toDateKey));
-    return appointments.filter((appointment) =>
-      visibleDates.has(appointment.date) &&
-      (statusFilter === "all" || appointment.status === statusFilter)
-    );
-  }, [appointments, monthDays, statusFilter]);
-
   const statusCounts = useMemo(() => {
-    const visibleAppointments = viewMode === "day"
-      ? appointments.filter((appointment) => appointment.date === selectedDate)
+    const visibleDates = viewMode === "day"
+      ? [selectedDate]
       : viewMode === "week"
-        ? appointments.filter((appointment) => weekDays.includes(appointment.date))
-        : appointments.filter((appointment) => monthDays.some((day) => toDateKey(day) === appointment.date));
-    return {
-      pending: visibleAppointments.filter((appointment) => appointment.status === "pending").length,
-      confirmed: visibleAppointments.filter((appointment) => appointment.status === "confirmed").length,
-      completed: visibleAppointments.filter((appointment) => appointment.status === "completed").length,
-    };
-  }, [appointments, viewMode, selectedDate, weekDays, monthDays]);
+        ? weekDays
+        : monthDays.map(toDateKey);
+    return visibleDates
+      .flatMap((day) => appointmentsByDate.get(day) ?? [])
+      .reduce(
+        (counts, appointment) => {
+          if (appointment.status === "pending") counts.pending += 1;
+          if (appointment.status === "confirmed") counts.confirmed += 1;
+          if (appointment.status === "completed") counts.completed += 1;
+          return counts;
+        },
+        { pending: 0, confirmed: 0, completed: 0 }
+      );
+  }, [appointmentsByDate, viewMode, selectedDate, weekDays, monthDays]);
 
   const dateTitle = new Intl.DateTimeFormat("es-ES", {
     weekday: "long",
@@ -141,7 +146,8 @@ export function AppointmentCalendar({
       )}
       {viewMode === "month" && (
         <CalendarMonthView
-          appointments={monthAppointments}
+          appointmentsByDate={appointmentsByDate}
+          statusFilter={statusFilter}
           services={services}
           days={monthDays}
           selectedDate={selectedDate}

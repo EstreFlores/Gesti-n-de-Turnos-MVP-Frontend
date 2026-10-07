@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@/components/ui/toast";
+import { toast } from "@/components/ui/toastManager";
 import { appointmentService } from "@/features/appointments/api/appointmentService";
 import type { Appointment, Service } from "@/types/appointment";
 
@@ -25,6 +25,7 @@ export function useAppointments() {
         clientName: appointment.clientName,
         clientPhone: appointment.clientPhone,
         serviceId: appointment.serviceId,
+        durationMinutes: appointment.durationMinutes,
         professionalId: appointment.professionalId,
         date: appointment.date,
         startTime: appointment.startTime,

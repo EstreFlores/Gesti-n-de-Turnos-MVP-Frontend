@@ -1,6 +1,7 @@
 import { Clock } from "lucide-react";
 import { PROFESSIONALS } from "@/features/appointments/data/professionals";
-import { getProfessionalId } from "@/components/calendar/calendarUtils";
+import { getProfessionalId } from "@/features/appointments/components/AppointmentCalendar/calendarUtils";
+import { getServiceName } from "@/features/appointments/utils/serviceUtils";
 import type { Appointment, Service } from "@/types/appointment";
 
 interface CalendarDayViewProps {
@@ -16,9 +17,6 @@ export function CalendarDayView({
   timeSlots,
   onSelectAppointment,
 }: CalendarDayViewProps) {
-  const getServiceName = (serviceId: string) =>
-    services.find((service) => service.id === serviceId)?.name ?? "Servicio";
-
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
       <div className="grid grid-cols-5 border-b border-slate-100 bg-slate-50/70 text-center">
@@ -62,7 +60,7 @@ export function CalendarDayView({
                             <span className="truncate text-xs font-bold text-slate-900">{appointment.clientName}</span>
                             <span className="rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-medium uppercase text-white">{appointment.status}</span>
                           </div>
-                          <p className="mt-0.5 truncate text-[11px] font-medium text-primary">{getServiceName(appointment.serviceId)}</p>
+                          <p className="mt-0.5 truncate text-[11px] font-medium text-primary">{getServiceName(services, appointment.serviceId)}</p>
                           <div className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
                             <Clock size={10} /> {appointment.startTime} ({appointment.durationMinutes}m)
                           </div>

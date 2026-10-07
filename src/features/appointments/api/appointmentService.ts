@@ -41,16 +41,9 @@ export const appointmentService = {
   },
 
   // POST /appointments
-  createAppointment: async (newAppointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt" | "durationMinutes">): Promise<Appointment> => {
-   
-    //aqui se obtienen los servicios para calcular la duración automáticamente
-    const services = await appointmentService.getServices();
-    const service = services.find(s => s.id === newAppointmentData.serviceId);
-    const durationMinutes = service ? service.durationMinutes : 30;
-
+  createAppointment: async (newAppointmentData: Omit<Appointment, "id" | "createdAt" | "updatedAt">): Promise<Appointment> => {
     const payload = {
       ...newAppointmentData,
-      durationMinutes,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

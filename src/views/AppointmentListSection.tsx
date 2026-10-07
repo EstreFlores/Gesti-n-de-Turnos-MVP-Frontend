@@ -1,4 +1,4 @@
-import { AppointmentTable, type AppointmentTableProps } from "@/components/AppointmentTable";
+import { AppointmentTable, type AppointmentTableProps } from "@/features/appointments/components/AppointmentTable";
 
 interface AppointmentListSectionProps {
   title: string;
